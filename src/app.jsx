@@ -33,23 +33,23 @@ const DMEIntakeSystem = () => {
       zip: '07457',
       phone: '(973) 363-9011',
       fax: '(973) 341-7791',
-      npi: '1234567890',
-      taxId: '12-3456789',
+      npi: '15-98559932',
+      taxId: '33-2578521',
       referringProvider: 'Dr. Jack Atzmon, DC',
       referringNPI: '1962565648'
     },
     njback: {
       name: 'NJback Chiropractic Center, LLC',
-      address: '456 Wellness Ave',
-      city: 'Your City',
+      address: '47 Hamburg Turnpike',
+      city: 'Riverdale',
       state: 'NJ',
-      zip: '07002',
-      phone: '(555) 987-6543',
-      fax: '(555) 987-6544',
-      npi: '0987654321',
-      taxId: '98-7654321',
-      referringProvider: 'Dr. Your Name, DC',
-      referringNPI: '1234567890'
+      zip: '07457',
+      phone: '(973) 874-9777',
+      fax: '(973) 341-7791',
+      npi: '16-69963120',
+      taxId: '83-0560602',
+      referringProvider: 'Dr. Jack Atzmon, DC',
+      referringNPI: '19-62565648'
     }
   };
 
