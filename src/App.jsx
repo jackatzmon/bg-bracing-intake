@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ChevronRight, ChevronLeft, Printer, Upload, Scan, Wifi, WifiOff } from 'lucide-react';
+import { Camera, ChevronRight, ChevronLeft, Printer, Upload, Scan, Wifi, WifiOff, FolderOpen, Send, Check, Cloud } from 'lucide-react';
 
 const DMEIntakeSystem = () => {
   const [mode, setMode] = useState('setup');
@@ -16,6 +16,12 @@ const DMEIntakeSystem = () => {
   const [patientPrescription, setPatientPrescription] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSaved, setLastSaved] = useState(null);
+  const [savedPatients, setSavedPatients] = useState([]);
+  const [savingToDrive, setSavingToDrive] = useState(false);
+  const [driveConnected, setDriveConnected] = useState(false);
+  const [accessToken, setAccessToken] = useState(null);
+  const [currentFolderId, setCurrentFolderId] = useState(null);
+  const [billerEmail, setBillerEmail] = useState(localStorage.getItem('billerEmail') || '');
   
   const insCardRef = useRef(null);
   const dlRef = useRef(null);
@@ -23,6 +29,12 @@ const DMEIntakeSystem = () => {
   const providerCanvasRef = useRef(null);
   const acknowledgmentCanvasRef = useRef(null);
   const hipaaCanvasRef = useRef(null);
+
+  // Google OAuth Configuration - Replace with your credentials
+  const GOOGLE_CLIENT_ID = '614894762456-msbcf8h1kgstkogbimdmqt9dh2u1b210.apps.googleusercontent.com
+.apps.googleusercontent.com';
+  const GOOGLE_API_KEY = 'AIzaSyD7Bb-xrjEtf4I6lH4ojivveK_MR3Weeak';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
   
   const companies = {
     bgbracing: {
@@ -33,23 +45,23 @@ const DMEIntakeSystem = () => {
       zip: '07457',
       phone: '(973) 363-9011',
       fax: '(973) 341-7791',
-      npi: '15-98559932',
-      taxId: '33-2578521',
+      npi: '1234567890',
+      taxId: '12-3456789',
       referringProvider: 'Dr. Jack Atzmon, DC',
       referringNPI: '1962565648'
     },
     njback: {
       name: 'NJback Chiropractic Center, LLC',
-      address: '47 Hamburg Turnpike',
-      city: 'Riverdale',
+      address: '456 Wellness Ave',
+      city: 'Your City',
       state: 'NJ',
-      zip: '07457',
-      phone: '(973) 874-9777',
-      fax: '(973) 341-7791',
-      npi: '16-69963120',
-      taxId: '83-0560602',
-      referringProvider: 'Dr. Jack Atzmon, DC',
-      referringNPI: '19-62565648'
+      zip: '07002',
+      phone: '(555) 987-6543',
+      fax: '(555) 987-6544',
+      npi: '0987654321',
+      taxId: '98-7654321',
+      referringProvider: 'Dr. Your Name, DC',
+      referringNPI: '1234567890'
     }
   };
 
@@ -78,6 +90,199 @@ const DMEIntakeSystem = () => {
     update(field, arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
   };
 
+  // Load Google API
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://apis.google.com/js/api.js';
+    script.onload = () => {
+      window.gapi.load('client:auth2', initGoogleClient);
+    };
+    document.body.appendChild(script);
+  }, []);
+
+  const initGoogleClient = async () => {
+    try {
+      await window.gapi.client.init({
+        apiKey: GOOGLE_API_KEY,
+        clientId: GOOGLE_CLIENT_ID,
+        scope: SCOPES,
+        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
+      });
+      
+      // Check if already signed in
+      const authInstance = window.gapi.auth2.getAuthInstance();
+      if (authInstance.isSignedIn.get()) {
+        setDriveConnected(true);
+        setAccessToken(authInstance.currentUser.get().getAuthResponse().access_token);
+      }
+    } catch (error) {
+      console.error('Error initializing Google client:', error);
+    }
+  };
+
+  const connectGoogleDrive = async () => {
+    try {
+      const authInstance = window.gapi.auth2.getAuthInstance();
+      await authInstance.signIn();
+      setDriveConnected(true);
+      setAccessToken(authInstance.currentUser.get().getAuthResponse().access_token);
+    } catch (error) {
+      console.error('Error connecting to Google Drive:', error);
+      alert('Failed to connect to Google Drive. Please try again.');
+    }
+  };
+
+  const disconnectGoogleDrive = () => {
+    const authInstance = window.gapi.auth2.getAuthInstance();
+    authInstance.signOut();
+    setDriveConnected(false);
+    setAccessToken(null);
+    setCurrentFolderId(null);
+  };
+
+  const createEventFolder = async () => {
+    if (!driveConnected) return null;
+    
+    const folderName = `DME Claims - ${eventName} - ${eventDate}`;
+    
+    try {
+      const response = await window.gapi.client.drive.files.create({
+        resource: {
+          name: folderName,
+          mimeType: 'application/vnd.google-apps.folder'
+        },
+        fields: 'id'
+      });
+      
+      setCurrentFolderId(response.result.id);
+      return response.result.id;
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      return null;
+    }
+  };
+
+  const generatePDFBlob = () => {
+    const html = generatePacketHTML();
+    return new Blob([html], { type: 'text/html' });
+  };
+
+  const saveToGoogleDrive = async () => {
+    if (!driveConnected) {
+      alert('Please connect to Google Drive first');
+      return false;
+    }
+
+    setSavingToDrive(true);
+
+    try {
+      let folderId = currentFolderId;
+      if (!folderId) {
+        folderId = await createEventFolder();
+      }
+
+      const fullName = `${data.lastName}_${data.firstName}`.replace(/\s+/g, '_');
+      const fileName = `${fullName}_${eventDate}.html`;
+      const htmlContent = generatePacketHTML();
+
+      const file = new Blob([htmlContent], { type: 'text/html' });
+      const metadata = {
+        name: fileName,
+        mimeType: 'text/html',
+        parents: folderId ? [folderId] : []
+      };
+
+      const form = new FormData();
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', file);
+
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        },
+        body: form
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setSavedPatients(prev => [...prev, {
+          name: `${data.firstName} ${data.lastName}`,
+          fileId: result.id,
+          timestamp: new Date().toLocaleTimeString()
+        }]);
+        setSavingToDrive(false);
+        return true;
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (error) {
+      console.error('Error saving to Drive:', error);
+      alert('Failed to save to Google Drive. Please try again.');
+      setSavingToDrive(false);
+      return false;
+    }
+  };
+
+  const sendToBiller = async () => {
+    if (!billerEmail) {
+      alert('Please enter biller email address');
+      return;
+    }
+
+    if (!currentFolderId) {
+      alert('No files saved yet for this event');
+      return;
+    }
+
+    localStorage.setItem('billerEmail', billerEmail);
+
+    try {
+      // Get folder sharing link
+      await window.gapi.client.drive.permissions.create({
+        fileId: currentFolderId,
+        resource: {
+          role: 'reader',
+          type: 'user',
+          emailAddress: billerEmail
+        },
+        sendNotificationEmail: true,
+        emailMessage: `DME Claim Packets for ${eventName} on ${eventDate}. Please find all patient files in this folder.`
+      });
+
+      alert(`✓ Folder shared with ${billerEmail}!\n\nYour biller will receive an email notification with access to all ${savedPatients.length} patient files.`);
+    } catch (error) {
+      console.error('Error sharing folder:', error);
+      
+      // Fallback: Get shareable link
+      try {
+        await window.gapi.client.drive.permissions.create({
+          fileId: currentFolderId,
+          resource: {
+            role: 'reader',
+            type: 'anyone'
+          }
+        });
+
+        const linkResponse = await window.gapi.client.drive.files.get({
+          fileId: currentFolderId,
+          fields: 'webViewLink'
+        });
+
+        const link = linkResponse.result.webViewLink;
+        
+        // Open email client with link
+        const subject = encodeURIComponent(`DME Claim Packets - ${eventName} - ${eventDate}`);
+        const body = encodeURIComponent(`Here are the DME Claim Packets for ${eventName} on ${eventDate}.\n\nFolder Link: ${link}\n\nTotal Patients: ${savedPatients.length}`);
+        window.open(`mailto:${billerEmail}?subject=${subject}&body=${body}`);
+        
+      } catch (linkError) {
+        console.error('Error creating share link:', linkError);
+        alert('Failed to share folder. Please share manually from Google Drive.');
+      }
+    }
+  };
+
   // Auto-save to localStorage every time data changes
   useEffect(() => {
     if (mode === 'intake' && step > 0) {
@@ -93,12 +298,14 @@ const DMEIntakeSystem = () => {
         driversLicenseImg,
         patientPrescription,
         autoRouted,
+        savedPatients,
+        currentFolderId,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('dme-intake-current', JSON.stringify(saveData));
       setLastSaved(new Date().toLocaleTimeString());
     }
-  }, [data, step, mode, signatures, company, eventDate, eventName, insuranceCardImg, driversLicenseImg, patientPrescription, autoRouted]);
+  }, [data, step, mode, signatures, company, eventDate, eventName, insuranceCardImg, driversLicenseImg, patientPrescription, autoRouted, savedPatients, currentFolderId]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -118,6 +325,8 @@ const DMEIntakeSystem = () => {
           setDriversLicenseImg(parsed.driversLicenseImg);
           setPatientPrescription(parsed.patientPrescription);
           setAutoRouted(parsed.autoRouted);
+          setSavedPatients(parsed.savedPatients || []);
+          setCurrentFolderId(parsed.currentFolderId || null);
         }
       } catch (e) {
         console.error('Error loading saved data:', e);
@@ -291,6 +500,8 @@ const DMEIntakeSystem = () => {
       setInsuranceCardImg(null);
       setDriversLicenseImg(null);
       setPatientPrescription(null);
+      setSavedPatients([]);
+      setCurrentFolderId(null);
       setData({
         firstName: '', lastName: '', middleName: '', age: '', dob: '', sex: '', 
         address: '', city: '', state: '', zip: '', phone: '', email: '', employer: '',
@@ -476,18 +687,33 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
     win.onload = () => setTimeout(() => {win.focus();win.print()}, 500);
   };
 
+  const handleSaveAndNext = async () => {
+    const saved = await saveToGoogleDrive();
+    if (saved) {
+      startNewPatient();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
         
-        {/* Online/Offline Status Indicator */}
-        {mode === 'intake' && (
-          <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {isOnline ? <Wifi className="w-5 h-5"/> : <WifiOff className="w-5 h-5"/>}
-            <div>
-              <div className="font-bold">{isOnline ? 'Online' : 'Offline'}</div>
-              {lastSaved && <div className="text-xs">Saved: {lastSaved}</div>}
+        {/* Online/Offline & Drive Status */}
+        {mode !== 'setup' && (
+          <div className="fixed top-4 right-4 flex flex-col gap-2 z-50">
+            <div className={`px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {isOnline ? <Wifi className="w-5 h-5"/> : <WifiOff className="w-5 h-5"/>}
+              <div>
+                <div className="font-bold text-sm">{isOnline ? 'Online' : 'Offline'}</div>
+                {lastSaved && <div className="text-xs">Saved: {lastSaved}</div>}
+              </div>
             </div>
+            {driveConnected && (
+              <div className="px-4 py-2 rounded-lg shadow-lg bg-blue-100 text-blue-800 flex items-center gap-2">
+                <Cloud className="w-5 h-5"/>
+                <span className="text-sm font-bold">Drive Connected</span>
+              </div>
+            )}
           </div>
         )}
         
@@ -495,8 +721,40 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
           <div className="bg-white rounded-lg shadow p-8">
             <h1 className="text-3xl font-bold mb-6">Event Setup</h1>
             
+            {/* Google Drive Connection */}
+            <div className="mb-6 p-4 border-2 rounded-lg bg-gray-50">
+              <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+                <Cloud className="w-6 h-6"/>Google Drive Connection
+              </h2>
+              {!driveConnected ? (
+                <div>
+                  <p className="text-sm text-gray-600 mb-3">Connect to save patient files and send to your biller.</p>
+                  <button onClick={connectGoogleDrive} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <Cloud className="w-5 h-5"/>Connect Google Drive
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <p className="text-green-600 font-bold flex items-center gap-2"><Check className="w-5 h-5"/>Connected to Google Drive</p>
+                  <button onClick={disconnectGoogleDrive} className="text-sm text-gray-500 hover:text-gray-700">Disconnect</button>
+                </div>
+              )}
+            </div>
+
+            {/* Biller Email */}
             <div className="mb-6">
-              <h2 className="text-xl font-bold mb-4">1. Event Information</h2>
+              <label className="block text-sm font-medium mb-2">Biller Email (for sending completed packets)</label>
+              <input 
+                type="email" 
+                value={billerEmail} 
+                onChange={(e) => setBillerEmail(e.target.value)} 
+                placeholder="biller@example.com" 
+                className="w-full border-2 rounded-lg px-4 py-3 text-lg"
+              />
+            </div>
+            
+            <div className="mb-6">
+              <h2 className="text-xl font-bold mb-4">Event Information</h2>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Event Name * (Internal Use Only)</label>
@@ -567,6 +825,9 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               <div>
                 <h1 className="text-2xl font-bold">Patient Intake - Step {step} of 7</h1>
                 <p className="text-sm text-blue-600">{company ? companies[company].name : 'No company selected'} | Date: {eventDate}</p>
+                {savedPatients.length > 0 && (
+                  <p className="text-sm text-green-600 mt-1">✓ {savedPatients.length} patient(s) saved to Drive</p>
+                )}
               </div>
               <div className="flex gap-2">
                 <button onClick={startNewPatient} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">New Patient</button>
@@ -920,17 +1181,72 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
 
         {mode === 'intake' && step === 7 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">PRINT CLAIM PACKET</h2>
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">SAVE & COMPLETE</h2>
+            
             <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 mb-6">
-              <h3 className="font-bold text-green-800 mb-3 text-xl">✓ Ready to Print!</h3>
-              <p className="text-green-700 mb-4">Complete claim packet ready with all information and signatures.</p>
+              <h3 className="font-bold text-green-800 mb-3 text-xl">✓ Patient Ready!</h3>
+              <p className="text-green-700 mb-2"><strong>Patient:</strong> {data.firstName} {data.lastName}</p>
+              <p className="text-green-700 mb-4"><strong>Devices:</strong> {data.device.join(', ')}</p>
             </div>
+
+            {/* Save to Google Drive */}
+            {driveConnected ? (
+              <button 
+                onClick={handleSaveAndNext} 
+                disabled={savingToDrive}
+                className="w-full bg-blue-600 text-white px-6 py-4 rounded-lg text-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-4 disabled:bg-blue-400"
+              >
+                <Cloud className="w-8 h-8"/>
+                {savingToDrive ? 'Saving...' : 'Save to Drive & Next Patient'}
+              </button>
+            ) : (
+              <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
+                <p className="text-yellow-800 mb-2">Google Drive not connected. Files will only be available for printing.</p>
+                <button onClick={connectGoogleDrive} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
+                  <Cloud className="w-5 h-5"/>Connect Google Drive
+                </button>
+              </div>
+            )}
+
             <button onClick={handlePrint} className="w-full bg-green-600 text-white px-6 py-4 rounded-lg text-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 mb-4">
               <Printer className="w-8 h-8"/>Print Claim Packet
             </button>
+
+            {/* Saved Patients Summary */}
+            {savedPatients.length > 0 && (
+              <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
+                <h4 className="font-bold mb-2 flex items-center gap-2"><FolderOpen className="w-5 h-5"/>Saved to Google Drive ({savedPatients.length})</h4>
+                <ul className="text-sm space-y-1">
+                  {savedPatients.map((p, i) => (
+                    <li key={i} className="flex items-center gap-2"><Check className="w-4 h-4 text-green-600"/>{p.name} - {p.timestamp}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Send to Biller */}
+            {savedPatients.length > 0 && driveConnected && (
+              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4 mb-4">
+                <h4 className="font-bold mb-2 flex items-center gap-2"><Send className="w-5 h-5"/>Send to Biller</h4>
+                <div className="flex gap-2">
+                  <input 
+                    type="email" 
+                    value={billerEmail} 
+                    onChange={(e) => setBillerEmail(e.target.value)} 
+                    placeholder="biller@example.com" 
+                    className="flex-1 border rounded px-3 py-2"
+                  />
+                  <button onClick={sendToBiller} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center gap-2">
+                    <Send className="w-5 h-5"/>Send
+                  </button>
+                </div>
+                <p className="text-sm text-purple-700 mt-2">Shares the entire event folder with {savedPatients.length} patient file(s)</p>
+              </div>
+            )}
+
             <div className="flex gap-4">
               <button onClick={startNewPatient} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">New Patient (Same Event)</button>
-              <button onClick={changeEvent} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-700">Change Event</button>
+              <button onClick={changeEvent} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-700">End Event</button>
             </div>
           </div>
         )}
