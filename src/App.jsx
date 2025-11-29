@@ -31,7 +31,7 @@ const DMEIntakeSystem = () => {
   const hipaaCanvasRef = useRef(null);
 
   // Google OAuth Configuration - Replace with your credentials
-  const GOOGLE_CLIENT_ID = '614894762456-msbcf8h1kgstkogbimdmqt9dh2u1b210.apps.googleusercontent.com.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_ID = '614894762456-msbcf8h1kgstkogbimdmqt9dh2u1b210.apps.googleusercontent.com';
   const GOOGLE_API_KEY = 'AIzaSyD7Bb-xrjEtf4I6lH4ojivveK_MR3Weeak';
   const SCOPES = 'https://www.googleapis.com/auth/drive.file';
   
