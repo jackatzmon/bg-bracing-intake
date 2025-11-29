@@ -67,7 +67,8 @@ const DMEIntakeSystem = () => {
     painBehavior: [],
     functionalImpact: [],
     otherNotes: '',
-    mechanicalLBPFindings: false
+    mechanicalLBPFindings: false,
+    lengthOfNeed: '3 months'
   });
 
   const update = (field, value) => setData(prev => ({...prev, [field]: value}));
@@ -151,60 +152,12 @@ const DMEIntakeSystem = () => {
     }
   };
 
-  const extractInsuranceData = (imageData) => {
-    const insuranceName = prompt('📋 Insurance Company:\n(e.g., Horizon BCBS, United Healthcare, Aetna)');
-    const memberId = prompt('🔢 Member ID:');
-    const groupNumber = prompt('👥 Group Number (optional):');
-    const patientName = prompt('👤 Patient Name on Card:');
-    
-    if (insuranceName) {
-      update('primaryIns', insuranceName);
-      autoRouteCompany(insuranceName);
-    }
-    if (memberId) update('primaryID', memberId);
-    if (groupNumber) update('primaryGroup', groupNumber);
-    
-    if (patientName) {
-      const parts = patientName.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        update('firstName', parts[0]);
-        update('lastName', parts[parts.length - 1]);
-        if (parts.length === 3) update('middleName', parts[1]);
-      }
-    }
-  };
-
-  const extractLicenseData = (imageData) => {
-    const firstName = prompt('👤 First Name:');
-    const lastName = prompt('👤 Last Name:');
-    const dob = prompt('🎂 DOB (YYYY-MM-DD):');
-    const address = prompt('🏠 Address:');
-    const city = prompt('🏙️ City:');
-    const state = prompt('📍 State (2 letters):');
-    const zip = prompt('📮 ZIP:');
-    const sex = prompt('⚧️ Sex (M/F):');
-    
-    if (firstName) update('firstName', firstName);
-    if (lastName) update('lastName', lastName);
-    if (dob) {
-      update('dob', dob);
-      const age = Math.floor((new Date() - new Date(dob)) / 31557600000);
-      update('age', age.toString());
-    }
-    if (address) update('address', address);
-    if (city) update('city', city);
-    if (state) update('state', state.toUpperCase());
-    if (zip) update('zip', zip);
-    if (sex) update('sex', sex.toUpperCase());
-  };
-
   const handleInsCardUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (evt) => {
       setInsuranceCardImg(evt.target.result);
-      setTimeout(() => extractInsuranceData(evt.target.result), 500);
     };
     reader.readAsDataURL(file);
   };
@@ -215,7 +168,6 @@ const DMEIntakeSystem = () => {
     const reader = new FileReader();
     reader.onload = (evt) => {
       setDriversLicenseImg(evt.target.result);
-      setTimeout(() => extractLicenseData(evt.target.result), 500);
     };
     reader.readAsDataURL(file);
   };
@@ -228,7 +180,28 @@ const DMEIntakeSystem = () => {
     reader.readAsDataURL(file);
   };
 
+  const getCanvasCoordinates = (e, canvas) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    
+    let clientX, clientY;
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
+    };
+  };
+
   const startDraw = (canvasRef) => (e) => {
+    e.preventDefault();
     setActiveCanvas(canvasRef);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -236,13 +209,10 @@ const DMEIntakeSystem = () => {
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#000';
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = e.touches ? (e.touches[0].clientX - rect.left) * scaleX : (e.clientX - rect.left) * scaleX;
-    const y = e.touches ? (e.touches[0].clientY - rect.top) * scaleY : (e.clientY - rect.top) * scaleY;
+    
+    const coords = getCanvasCoordinates(e, canvas);
     ctx.beginPath();
-    ctx.moveTo(x, y);
+    ctx.moveTo(coords.x, coords.y);
     setDrawing(true);
   };
 
@@ -252,12 +222,9 @@ const DMEIntakeSystem = () => {
     const canvas = activeCanvas.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = e.touches ? (e.touches[0].clientX - rect.left) * scaleX : (e.clientX - rect.left) * scaleX;
-    const y = e.touches ? (e.touches[0].clientY - rect.top) * scaleY : (e.clientY - rect.top) * scaleY;
-    ctx.lineTo(x, y);
+    
+    const coords = getCanvasCoordinates(e, canvas);
+    ctx.lineTo(coords.x, coords.y);
     ctx.stroke();
   };
 
@@ -299,7 +266,8 @@ const DMEIntakeSystem = () => {
         painBehavior: [],
         functionalImpact: [],
         otherNotes: '',
-        mechanicalLBPFindings: false
+        mechanicalLBPFindings: false,
+        lengthOfNeed: '3 months'
       });
       setSigs({provider: null, acknowledgment: null, hipaa: null});
       setInsuranceCardImg(null);
@@ -337,18 +305,164 @@ const DMEIntakeSystem = () => {
         painBehavior: [],
         functionalImpact: [],
         otherNotes: '',
-        mechanicalLBPFindings: false
+        mechanicalLBPFindings: false,
+        lengthOfNeed: '3 months'
       });
       setSigs({provider: null, acknowledgment: null, hipaa: null});
     }
   };
+
+  const providerAttestationText = `I certify that I personally evaluated the patient, documented objective findings, performed and/or supervised custom fitting, and determined the prescribed orthosis is medically necessary under CMS and payer coverage standards. Custom fitting included bending, cutting, and/or sizing and instructing the patient on the use of the brace.`;
+
+  const patientAcknowledgmentText = `I authorize B.G. Bracing LLC and my provider to release any medical information necessary to process insurance claims and receive direct payment of benefits. I acknowledge financial responsibility for non-covered charges. I confirm I have received and been custom fitted for the devices indicated above and was instructed in proper use and care.`;
+
+  const hipaaAcknowledgmentText = `I acknowledge receipt of the Notice of Privacy Practices.`;
 
   const generatePacketHTML = () => {
     const fullName = `${data.firstName} ${data.middleName ? data.middleName + ' ' : ''}${data.lastName}`;
     const today = eventDate || new Date().toLocaleDateString();
     const companyInfo = companies[company] || companies.bgbracing;
     
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DME Claim - ${fullName}</title><style>@page{size:letter;margin:0.5in}body{font-family:Arial,sans-serif;font-size:10pt;margin:0;padding:20px}.header{text-align:center;margin-bottom:20px;border-bottom:3px solid #000;padding-bottom:10px}.company-name{font-size:18pt;font-weight:bold}.section-title{background:#333;color:white;padding:8px;font-weight:bold;margin-top:15px}.field{margin:5px 0}.label{font-weight:bold;display:inline-block;min-width:150px}.sig-img{max-height:60px;border-bottom:2px solid #000;margin-top:5px}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #000;padding:8px;text-align:left}th{background:#e0e0e0;font-weight:bold}ul{margin:5px 0 5px 20px}.box{border:2px solid #000;padding:10px;margin:10px 0;background:#f9f9f9}.highlight-box{border:2px solid #06c;background:#e8f4fd;padding:10px;margin:10px 0}.red-box{border:2px solid #c00;background:#fee;padding:10px;margin:10px 0;font-weight:bold}.yellow-box{border:2px solid #c90;background:#fffbea;padding:10px;margin:10px 0}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><div class="header"><div class="company-name">${companyInfo.name}</div><div>${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div><div>Phone: ${companyInfo.phone} | NPI: ${companyInfo.npi}</div><div style="margin-top:10px;font-size:14pt;font-weight:bold">DME CLAIM PACKET</div><div>Event: ${eventName} | ${eventDate}</div></div><div class="section-title">PATIENT INFORMATION</div><div class="field"><span class="label">Name:</span> ${fullName}</div><div class="field"><span class="label">DOB:</span> ${data.dob} | <span class="label">Age:</span> ${data.age} | <span class="label">Sex:</span> ${data.sex}</div><div class="field"><span class="label">Address:</span> ${data.address}, ${data.city}, ${data.state} ${data.zip}</div><div class="field"><span class="label">Phone:</span> ${data.phone} | <span class="label">Email:</span> ${data.email}</div><div class="section-title">INSURANCE</div><div class="field"><span class="label">Insurance:</span> ${data.primaryIns} | <span class="label">ID:</span> ${data.primaryID}</div><div class="section-title">CLINICAL ASSESSMENT</div><div class="field"><span class="label">Pain Level:</span> ${data.painLevel}/10 | <span class="label">Onset:</span> ${data.onsetDate}</div>${data.mechanicalLBPFindings ? '<div class="highlight-box">✓ Findings consistent with mechanical low back pain requiring external stabilization</div>' : ''}<div class="section-title">DIAGNOSIS</div><div class="field">✓ M54.50 - Low Back Pain</div>${data.additionalICD.map(icd => `<div class="field">✓ ${icd}</div>`).join('')}<div class="red-box">Patient Initials: ${data.patientInitials || '______'}</div><div class="section-title">DEVICES</div><table><tr><th>Device</th><th>Code</th></tr>${data.device.includes('L0631') ? '<tr><td>Lumbar Sacral Orthosis</td><td>L0631</td></tr>' : ''}${data.device.includes('E0730') ? '<tr><td>TENS Unit</td><td>E0730</td></tr>' : ''}</table><div class="section-title">SIGNATURES</div><div class="field"><span class="label">Provider:</span> ${companyInfo.referringProvider}</div>${signatures.provider ? `<img src="${signatures.provider}" class="sig-img"/>` : '<div>_______________________</div>'}<div class="field" style="margin-top:20px"><span class="label">Patient:</span></div>${signatures.acknowledgment ? `<img src="${signatures.acknowledgment}" class="sig-img"/>` : '<div>_______________________</div>'}</body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DME Claim - ${fullName}</title>
+<style>
+@page{size:letter;margin:0.5in}
+body{font-family:Arial,sans-serif;font-size:9pt;margin:0;padding:15px}
+.header{text-align:center;margin-bottom:15px;border-bottom:3px solid #000;padding-bottom:8px}
+.company-name{font-size:16pt;font-weight:bold}
+.section-title{background:#333;color:white;padding:6px 8px;font-weight:bold;margin-top:12px;font-size:10pt}
+.subsection-title{background:#666;color:white;padding:4px 8px;font-weight:bold;margin-top:8px;font-size:9pt}
+.field{margin:3px 0}
+.label{font-weight:bold;display:inline-block;min-width:120px}
+.sig-img{max-height:50px;border-bottom:1px solid #000;margin-top:3px}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #000;padding:5px;text-align:left;font-size:9pt}
+th{background:#e0e0e0;font-weight:bold}
+.box{border:1px solid #000;padding:8px;margin:8px 0;background:#f9f9f9}
+.highlight-box{border:2px solid #06c;background:#e8f4fd;padding:8px;margin:8px 0}
+.red-box{border:2px solid #c00;background:#fee;padding:8px;margin:8px 0;font-weight:bold}
+.yellow-box{border:2px solid #c90;background:#fffbea;padding:8px;margin:8px 0}
+.attestation-box{border:1px solid #333;padding:10px;margin:10px 0;background:#fafafa}
+.attestation-text{font-size:8pt;margin-bottom:8px;line-height:1.4}
+ul{margin:3px 0 3px 15px;padding:0}
+li{margin:2px 0}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.compliance-box{border:2px solid #000;padding:10px;margin:10px 0;background:#fffff0}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body>
+
+<div class="header">
+<div class="company-name">${companyInfo.name}</div>
+<div>${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div>
+<div>Phone: ${companyInfo.phone} | Fax: ${companyInfo.fax} | NPI: ${companyInfo.npi}</div>
+<div style="margin-top:8px;font-size:12pt;font-weight:bold">DME CLAIM PACKET</div>
+<div>Date of Service: ${today}</div>
+</div>
+
+<div class="section-title">PATIENT INFORMATION</div>
+<div class="grid-2">
+<div><span class="label">Name:</span> ${fullName}</div>
+<div><span class="label">DOB:</span> ${data.dob} | Age: ${data.age} | Sex: ${data.sex}</div>
+</div>
+<div class="field"><span class="label">Address:</span> ${data.address}, ${data.city}, ${data.state} ${data.zip}</div>
+<div class="field"><span class="label">Phone:</span> ${data.phone} | <span class="label">Email:</span> ${data.email}</div>
+
+<div class="section-title">INSURANCE INFORMATION</div>
+<div class="field"><span class="label">Insurance:</span> ${data.primaryIns}</div>
+<div class="field"><span class="label">Member ID:</span> ${data.primaryID} | <span class="label">Group:</span> ${data.primaryGroup || 'N/A'}</div>
+
+<div class="section-title">CLINICAL ASSESSMENT</div>
+<div class="grid-2">
+<div><span class="label">Pain Level:</span> ${data.painLevel}/10</div>
+<div><span class="label">Onset Date:</span> ${data.onsetDate}</div>
+</div>
+<div class="field"><span class="label">Duration:</span> ${data.duration}</div>
+
+${data.medicalHistory.length > 0 ? `<div class="field"><span class="label">Medical History:</span> ${data.medicalHistory.join(', ')}</div>` : ''}
+${data.limitations.length > 0 ? `<div class="field"><span class="label">Functional Limitations:</span> ${data.limitations.join(', ')}</div>` : ''}
+${data.priorCare.length > 0 ? `<div class="field"><span class="label">Prior Care:</span> ${data.priorCare.join(', ')}</div>` : ''}
+
+<div class="subsection-title">Objective Assessment</div>
+<div class="field"><span class="label">Posture/Gait:</span> ${data.postureGait || 'Not assessed'}</div>
+<div class="field"><span class="label">Lumbar Mobility:</span> ${data.lumbarMobility || 'Not assessed'}</div>
+${data.painBehavior.length > 0 ? `<div class="field"><span class="label">Pain Behavior:</span> ${data.painBehavior.join(', ')}</div>` : ''}
+${data.functionalImpact.length > 0 ? `<div class="field"><span class="label">Functional Impact:</span> ${data.functionalImpact.join(', ')}</div>` : ''}
+${data.otherNotes ? `<div class="field"><span class="label">Other Notes:</span> ${data.otherNotes}</div>` : ''}
+
+${data.mechanicalLBPFindings ? '<div class="highlight-box">✓ Findings are consistent with mechanical low back pain requiring external stabilization to reduce motion, improve function, and decrease pain.</div>' : ''}
+
+<div class="section-title">CLINICAL ASSESSMENT AND PLAN</div>
+<div class="subsection-title">Primary ICD-10</div>
+<div class="field">✓ M54.50 - Low Back Pain, Unspecified</div>
+<div class="subsection-title">Additional ICD-10</div>
+${data.additionalICD.includes('M51.16') ? '<div class="field">✓ M51.16 - Degenerative Disc Disease (Lumbar)</div>' : ''}
+${data.additionalICD.includes('M47.819') ? '<div class="field">✓ M47.819 - Spondylosis, Unspecified</div>' : ''}
+
+<div class="highlight-box">
+<strong>UM Assessment Summary:</strong><br/>
+Evaluation demonstrates mechanical low back pain with postural imbalance and limited motion consistent with need for external stabilization to reduce pain and improve function.
+</div>
+
+<div class="box">
+<ul>
+<li>Recommend Lumbar Orthosis (L0631) and TENS Unit (E0730) for reduction of pain and stabilization</li>
+<li>Refer to chiropractic or physical therapy for active rehabilitation</li>
+<li>Instruct patient on home stretching, posture, and brace wear</li>
+<li>If patient self-treats/uses OTC drugs, patient reports self-management and declines formal treatment</li>
+</ul>
+<div class="red-box">Patient Initials: ${data.patientInitials || '______'}</div>
+</div>
+
+<div class="box">
+The above listed orthotic devices are medically necessary for treatment of lower back pain (M54.50) as part of a conservative care plan. The orthosis is prescribed to:
+<ul>
+<li>Reduce pain by limiting trunk motion</li>
+<li>Improve function and posture</li>
+<li>Prevent further injury and support spinal stability</li>
+</ul>
+Conservative measures (exercise, OTC medication, chiropractic/PT care) have been reviewed. Patient instructed in safe use, care, and expected outcomes.
+</div>
+
+<div class="section-title">DEVICES PRESCRIBED</div>
+<table>
+<tr><th>Device</th><th>HCPCS Code</th><th>Indication</th></tr>
+${data.device.includes('L0631') ? '<tr><td>Lumbar Sacral Orthosis</td><td>L0631</td><td>Pain reduction and stabilization</td></tr>' : ''}
+${data.device.includes('E0730') ? '<tr><td>TENS Unit</td><td>E0730</td><td>Adjunct pain management</td></tr>' : ''}
+<tr><td>Frequency</td><td colspan="2">6 hours per day</td></tr>
+<tr><td>Duration</td><td colspan="2">3 months</td></tr>
+<tr><td>Length of Need</td><td colspan="2">${data.lengthOfNeed}</td></tr>
+</table>
+<div class="field"><span class="label">Date Delivered:</span> ${data.dateDelivered}</div>
+
+<div class="compliance-box">
+<strong>COMPLIANCE STATEMENT:</strong><br/>
+This orthosis is not prescribed for comfort or posture correction alone but as part of a structured conservative treatment plan consistent with Aetna CPB #298 and CMS LCD L33802.
+</div>
+
+<div class="section-title">SIGNATURES</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">Provider Attestation</div>
+<div class="attestation-text">${providerAttestationText}</div>
+<div class="field"><span class="label">Provider:</span> ${companyInfo.referringProvider} | NPI: ${companyInfo.referringNPI}</div>
+${signatures.provider ? `<img src="${signatures.provider}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">Patient Acknowledgment</div>
+<div class="attestation-text">${patientAcknowledgmentText}</div>
+${signatures.acknowledgment ? `<img src="${signatures.acknowledgment}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">HIPAA Acknowledgment</div>
+<div class="attestation-text">${hipaaAcknowledgmentText}</div>
+${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+</body></html>`;
   };
 
   const handlePrint = () => {
@@ -368,7 +482,7 @@ const DMEIntakeSystem = () => {
         
         {/* Online/Offline Status Indicator */}
         {mode === 'intake' && (
-          <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
             {isOnline ? <Wifi className="w-5 h-5"/> : <WifiOff className="w-5 h-5"/>}
             <div>
               <div className="font-bold">{isOnline ? 'Online' : 'Offline'}</div>
@@ -385,7 +499,7 @@ const DMEIntakeSystem = () => {
               <h2 className="text-xl font-bold mb-4">1. Event Information</h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-2">Event Name *</label>
+                  <label className="block text-sm font-medium mb-2">Event Name * (Internal Use Only)</label>
                   <input type="text" value={eventName} onChange={(e) => setEventName(e.target.value)} placeholder="e.g., Springfield Health Fair 2024" className="w-full border-2 rounded-lg px-4 py-3 text-lg"/>
                 </div>
                 <div>
@@ -396,7 +510,7 @@ const DMEIntakeSystem = () => {
             </div>
 
             <button onClick={() => {
-              if (!company && !eventDate && !eventName) {
+              if (!eventDate || !eventName) {
                 alert('Please fill in event details');
                 return;
               }
@@ -417,7 +531,7 @@ const DMEIntakeSystem = () => {
             <div className="flex justify-between items-start mb-4">
               <div>
                 <h1 className="text-3xl font-bold mb-2">Document Capture</h1>
-                <p className="text-gray-600">Event: <strong>{eventName}</strong> | <strong>{eventDate}</strong></p>
+                <p className="text-gray-600">Date: <strong>{eventDate}</strong></p>
               </div>
               <button onClick={changeEvent} className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">Change Event</button>
             </div>
@@ -428,7 +542,7 @@ const DMEIntakeSystem = () => {
               <button onClick={() => insCardRef.current.click()} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
                 <Camera className="w-5 h-5"/>{insuranceCardImg ? 'Retake' : 'Capture'} Insurance Card
               </button>
-              {insuranceCardImg && <div className="mt-4"><img src={insuranceCardImg} alt="Insurance" className="max-w-md rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-2">✓ Captured {autoRouted && `→ ${company === 'njback' ? 'NJback' : 'BG Bracing'}`}</p></div>}
+              {insuranceCardImg && <div className="mt-4"><img src={insuranceCardImg} alt="Insurance" className="max-w-md rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-2">✓ Captured</p></div>}
             </div>
 
             <div className="mb-8 p-6 border-2 rounded-lg">
@@ -447,12 +561,12 @@ const DMEIntakeSystem = () => {
           </div>
         )}
 
-{mode === 'intake' && step > 0 && (
+        {mode === 'intake' && step > 0 && (
           <div className="bg-white rounded-lg shadow p-4 mb-4">
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-2xl font-bold">Patient Intake - Step {step} of 6</h1>
-                <p className="text-sm text-blue-600">{company ? companies[company].name : 'No company selected'} | Event: {eventName} ({eventDate})</p>
+                <h1 className="text-2xl font-bold">Patient Intake - Step {step} of 7</h1>
+                <p className="text-sm text-blue-600">{company ? companies[company].name : 'No company selected'} | Date: {eventDate}</p>
               </div>
               <div className="flex gap-2">
                 <button onClick={startNewPatient} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">New Patient</button>
@@ -465,11 +579,6 @@ const DMEIntakeSystem = () => {
         {mode === 'intake' && step === 1 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">PATIENT INFORMATION</h2>
-            {driversLicenseImg ? (
-              <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-6"><p className="text-sm text-blue-800">ℹ️ Auto-filled from license. Please review.</p></div>
-            ) : (
-              <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6"><p className="text-sm text-yellow-800">⚠️ Manual entry required.</p></div>
-            )}
             <div className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
                 <div><label className="block text-sm font-medium mb-1">First Name *</label><input type="text" value={data.firstName} onChange={(e) => update('firstName', e.target.value)} className="w-full border rounded px-3 py-2"/></div>
@@ -502,7 +611,6 @@ const DMEIntakeSystem = () => {
         {mode === 'intake' && step === 2 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">INSURANCE INFORMATION</h2>
-            {insuranceCardImg ? <div className="bg-green-50 border-2 border-green-400 rounded-lg p-4 mb-6"><p className="text-sm text-green-800">✓ Auto-filled from card</p></div> : <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-6"><p className="text-sm text-yellow-800">⚠️ Manual entry</p></div>}
             {insuranceCardImg && <div className="mb-6"><img src={insuranceCardImg} alt="Insurance" className="max-w-sm rounded border"/></div>}
             <div className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
@@ -532,17 +640,35 @@ const DMEIntakeSystem = () => {
 
         {mode === 'intake' && step === 3 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">CLINICAL ASSESSMENT</h2>
-            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Chief Complaints *</h3>
-            <div className="grid md:grid-cols-3 gap-3 mb-4">
-              {[{val:'lbp',label:'Lower back pain'},{val:'lumbar',label:'Lumbar instability'},{val:'degen',label:'Degenerative disc'}].map(item => <label key={item.val} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50"><input type="checkbox" checked={data.complaints.includes(item.val)} onChange={() => toggleArray('complaints',item.val)} className="mr-2 w-5 h-5"/>{item.label}</label>)}
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">MEDICAL HISTORY & PRIOR CARE</h2>
+            
+            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Medical History</h3>
+            <div className="grid md:grid-cols-3 gap-3 mb-6">
+              {['Diabetes', 'Cardiac Disease', 'Arthritis', 'Respiratory Disorder', 'No Significant Medical History'].map(item => (
+                <label key={item} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.medicalHistory.includes(item)} onChange={() => toggleArray('medicalHistory', item)} className="mr-2 w-5 h-5"/>{item}
+                </label>
+              ))}
             </div>
-            <div className="grid md:grid-cols-3 gap-4 mb-4">
-              <div><label className="block text-sm font-medium mb-1">Onset Date</label><input type="date" value={data.onsetDate} onChange={(e) => update('onsetDate', e.target.value)} max={new Date().toISOString().split('T')[0]} className="w-full border rounded px-3 py-2"/></div>
-              <div><label className="block text-sm font-medium mb-1">Duration</label><select value={data.duration} onChange={(e) => update('duration', e.target.value)} className="w-full border rounded px-3 py-2"><option value="">Select</option><option value="Acute (<3 mo)">Acute (&lt;3 mo)</option><option value="Chronic (>3 mo)">Chronic (&gt;3 mo)</option></select></div>
-              <div><label className="block text-sm font-medium mb-1">Pain Level (0-10) *</label><select value={data.painLevel} onChange={(e) => update('painLevel', e.target.value)} className="w-full border rounded px-3 py-2"><option value="">Select</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}{n===0?' - No Pain':n===3?' - Mild':n===6?' - Moderate':n===8?' - Severe':n===10?' - Worst':''}</option>)}</select></div>
+
+            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Functional Limitations</h3>
+            <div className="grid md:grid-cols-3 gap-3 mb-6">
+              {['Difficulty walking', 'Difficulty sitting', 'Difficulty standing', 'Limited bending', 'Sleep disturbance', 'Postural Weakness', 'Reduced ROM', 'Limited Lifting'].map(item => (
+                <label key={item} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.limitations.includes(item)} onChange={() => toggleArray('limitations', item)} className="mr-2 w-5 h-5"/>{item}
+                </label>
+              ))}
             </div>
-            <div className="mb-4 p-4 border-2 border-blue-300 rounded-lg bg-blue-50"><label className="flex items-start cursor-pointer"><input type="checkbox" checked={data.mechanicalLBPFindings} onChange={(e) => update('mechanicalLBPFindings', e.target.checked)} className="mr-3 mt-1 w-5 h-5"/><span className="font-bold">Findings consistent with mechanical low back pain requiring external stabilization</span></label></div>
+
+            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Prior Care</h3>
+            <div className="grid md:grid-cols-4 gap-3 mb-4">
+              {['Chiropractic', 'Physical Therapy', 'Medication', 'Surgery', 'Injection', 'Home Treatment', 'None'].map(item => (
+                <label key={item} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.priorCare.includes(item)} onChange={() => toggleArray('priorCare', item)} className="mr-2 w-5 h-5"/>{item}
+                </label>
+              ))}
+            </div>
+
             <div className="flex justify-between mt-6">
               <button onClick={() => setStep(2)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
               <button onClick={() => setStep(4)} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">Continue <ChevronRight className="w-5 h-5"/></button>
@@ -552,29 +678,80 @@ const DMEIntakeSystem = () => {
 
         {mode === 'intake' && step === 4 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">DEVICE SELECTION</h2>
-            <div className="mb-6">
-              <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Primary Diagnosis</h3>
-              <label className="flex items-center p-3 border-2 rounded"><input type="checkbox" checked={data.primaryICD === 'M54.50'} onChange={(e) => update('primaryICD', e.target.checked ? 'M54.50' : '')} className="mr-3 w-5 h-5"/><span className="font-medium">M54.50 - Low Back Pain</span></label>
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">CLINICAL ASSESSMENT</h2>
+            
+            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Chief Complaints *</h3>
+            <div className="grid md:grid-cols-3 gap-3 mb-4">
+              {[{val:'lbp',label:'Lower back pain'},{val:'lumbar',label:'Lumbar instability'},{val:'degen',label:'Degenerative disc'}].map(item => (
+                <label key={item.val} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.complaints.includes(item.val)} onChange={() => toggleArray('complaints',item.val)} className="mr-2 w-5 h-5"/>{item.label}
+                </label>
+              ))}
             </div>
-            <div className="mb-6 p-4 border-2 border-blue-300 rounded-lg bg-blue-50">
-              <h3 className="font-bold mb-3">UM Assessment</h3>
-              <p className="mb-3">Evaluation demonstrates mechanical low back pain with postural imbalance and limited motion.</p>
-              <div className="mt-4 p-3 bg-red-50 border-2 border-red-400 rounded"><label className="flex items-center"><span className="font-bold text-red-800 mr-3">Patient Initials: *</span><input type="text" value={data.patientInitials} onChange={(e) => update('patientInitials', e.target.value)} className="border-2 border-red-400 rounded px-3 py-1 w-20 text-center font-bold" maxLength="3"/></label></div>
+
+            <div className="grid md:grid-cols-3 gap-4 mb-4">
+              <div><label className="block text-sm font-medium mb-1">Onset Date</label><input type="date" value={data.onsetDate} onChange={(e) => update('onsetDate', e.target.value)} max={new Date().toISOString().split('T')[0]} className="w-full border rounded px-3 py-2"/></div>
+              <div><label className="block text-sm font-medium mb-1">Duration</label><select value={data.duration} onChange={(e) => update('duration', e.target.value)} className="w-full border rounded px-3 py-2"><option value="">Select</option><option value="Acute (<3 mo)">Acute (&lt;3 mo)</option><option value="Chronic (>3 mo)">Chronic (&gt;3 mo)</option></select></div>
+              <div><label className="block text-sm font-medium mb-1">Pain Level (0-10) *</label><select value={data.painLevel} onChange={(e) => update('painLevel', e.target.value)} className="w-full border rounded px-3 py-2"><option value="">Select</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}{n===0?' - No Pain':n===3?' - Mild':n===6?' - Moderate':n===8?' - Severe':n===10?' - Worst':''}</option>)}</select></div>
             </div>
-            <div className="mb-6">
-              <h3 className="font-bold mb-3 bg-gray-200 p-2 rounded">Devices *</h3>
-              <div className="space-y-3">
-                <label className="flex items-center p-4 border-2 rounded cursor-pointer hover:bg-blue-50"><input type="checkbox" checked={data.device.includes('L0631')} onChange={() => toggleArray('device', 'L0631')} className="mr-3 w-6 h-6"/><div><div className="font-bold">L0631 - Lumbar Sacral Orthosis</div><div className="text-sm text-gray-600">Pain reduction and stabilization</div></div></label>
-                <label className="flex items-center p-4 border-2 rounded cursor-pointer hover:bg-blue-50"><input type="checkbox" checked={data.device.includes('E0730')} onChange={() => toggleArray('device', 'E0730')} className="mr-3 w-6 h-6"/><div><div className="font-bold">E0730 - TENS Unit</div><div className="text-sm text-gray-600">Adjunct pain management</div></div></label>
+
+            <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded mt-6">Objective Assessment</h3>
+            
+            <div className="grid md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Posture/Gait</label>
+                <select value={data.postureGait} onChange={(e) => update('postureGait', e.target.value)} className="w-full border rounded px-3 py-2">
+                  <option value="">Select</option>
+                  <option value="Neutral">Neutral</option>
+                  <option value="Antalgic">Antalgic</option>
+                  <option value="Guarded">Guarded</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Lumbar Mobility</label>
+                <select value={data.lumbarMobility} onChange={(e) => update('lumbarMobility', e.target.value)} className="w-full border rounded px-3 py-2">
+                  <option value="">Select</option>
+                  <option value="Mild Restriction">Mild Restriction</option>
+                  <option value="Moderate Restriction">Moderate Restriction</option>
+                  <option value="Severe Restriction">Severe Restriction</option>
+                </select>
               </div>
             </div>
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Upload Prescription (Optional)</label>
-              <input type="file" ref={rxRef} onChange={handleRxUpload} accept="image/*,application/pdf" className="hidden"/>
-              <button onClick={() => rxRef.current.click()} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"><Upload className="w-5 h-5"/>Upload Rx</button>
-              {patientPrescription && <p className="text-green-600 mt-2">✓ Uploaded</p>}
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Pain Behavior</label>
+              <div className="grid md:grid-cols-3 gap-3">
+                {['Local Tenderness', 'Muscle Guarding', 'Pain on Movement'].map(item => (
+                  <label key={item} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                    <input type="checkbox" checked={data.painBehavior.includes(item)} onChange={() => toggleArray('painBehavior', item)} className="mr-2 w-5 h-5"/>{item}
+                  </label>
+                ))}
+              </div>
             </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Functional Impact</label>
+              <div className="grid md:grid-cols-2 gap-3">
+                {['Limited ADL Performance', 'Difficulty Standing/Sitting', 'Sleep Disturbance'].map(item => (
+                  <label key={item} className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                    <input type="checkbox" checked={data.functionalImpact.includes(item)} onChange={() => toggleArray('functionalImpact', item)} className="mr-2 w-5 h-5"/>{item}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1">Other Notes</label>
+              <textarea value={data.otherNotes} onChange={(e) => update('otherNotes', e.target.value)} className="w-full border rounded px-3 py-2" rows="2" placeholder="Additional clinical notes..."/>
+            </div>
+
+            <div className="mb-4 p-4 border-2 border-blue-300 rounded-lg bg-blue-50">
+              <label className="flex items-start cursor-pointer">
+                <input type="checkbox" checked={data.mechanicalLBPFindings} onChange={(e) => update('mechanicalLBPFindings', e.target.checked)} className="mr-3 mt-1 w-5 h-5"/>
+                <span className="font-bold">Findings are consistent with mechanical low back pain requiring external stabilization to reduce motion, improve function, and decrease pain.</span>
+              </label>
+            </div>
+
             <div className="flex justify-between mt-6">
               <button onClick={() => setStep(3)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
               <button onClick={() => setStep(5)} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">Continue <ChevronRight className="w-5 h-5"/></button>
@@ -584,12 +761,112 @@ const DMEIntakeSystem = () => {
 
         {mode === 'intake' && step === 5 && (
           <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">CLINICAL ASSESSMENT & PLAN</h2>
+            
+            <div className="mb-6">
+              <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Primary ICD-10</h3>
+              <label className="flex items-center p-3 border-2 rounded bg-blue-50">
+                <input type="checkbox" checked={data.primaryICD === 'M54.50'} onChange={(e) => update('primaryICD', e.target.checked ? 'M54.50' : '')} className="mr-3 w-5 h-5"/>
+                <span className="font-medium">M54.50 - Low Back Pain, Unspecified</span>
+              </label>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Additional ICD-10</h3>
+              <div className="space-y-2">
+                <label className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.additionalICD.includes('M51.16')} onChange={() => toggleArray('additionalICD', 'M51.16')} className="mr-3 w-5 h-5"/>
+                  <span>M51.16 - Degenerative Disc Disease (Lumbar)</span>
+                </label>
+                <label className="flex items-center p-3 border rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.additionalICD.includes('M47.819')} onChange={() => toggleArray('additionalICD', 'M47.819')} className="mr-3 w-5 h-5"/>
+                  <span>M47.819 - Spondylosis, Unspecified</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="mb-6 p-4 border-2 border-blue-300 rounded-lg bg-blue-50">
+              <h3 className="font-bold mb-3">UM Assessment Summary</h3>
+              <p className="mb-3">Evaluation demonstrates mechanical low back pain with postural imbalance and limited motion consistent with need for external stabilization to reduce pain and improve function.</p>
+              <ul className="list-disc ml-5 mb-4 space-y-1 text-sm">
+                <li>Recommend Lumbar Orthosis (L0631) and TENS Unit (E0730) for reduction of pain and stabilization</li>
+                <li>Refer to chiropractic or physical therapy for active rehabilitation</li>
+                <li>Instruct patient on home stretching, posture, and brace wear</li>
+                <li>If patient self-treats/uses OTC drugs, patient reports self-management and declines formal treatment</li>
+              </ul>
+              <div className="mt-4 p-3 bg-red-50 border-2 border-red-400 rounded">
+                <label className="flex items-center">
+                  <span className="font-bold text-red-800 mr-3">Patient Initials: *</span>
+                  <input type="text" value={data.patientInitials} onChange={(e) => update('patientInitials', e.target.value)} className="border-2 border-red-400 rounded px-3 py-1 w-20 text-center font-bold" maxLength="3"/>
+                </label>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <h3 className="font-bold mb-3 bg-gray-200 p-2 rounded">Devices *</h3>
+              <div className="space-y-3">
+                <label className="flex items-center p-4 border-2 rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.device.includes('L0631')} onChange={() => toggleArray('device', 'L0631')} className="mr-3 w-6 h-6"/>
+                  <div>
+                    <div className="font-bold">L0631 - Lumbar Sacral Orthosis</div>
+                    <div className="text-sm text-gray-600">Pain reduction and stabilization | Frequency: 6 hours/day</div>
+                  </div>
+                </label>
+                <label className="flex items-center p-4 border-2 rounded cursor-pointer hover:bg-blue-50">
+                  <input type="checkbox" checked={data.device.includes('E0730')} onChange={() => toggleArray('device', 'E0730')} className="mr-3 w-6 h-6"/>
+                  <div>
+                    <div className="font-bold">E0730 - TENS Unit (Optional)</div>
+                    <div className="text-sm text-gray-600">Adjunct pain management</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Length of Need *</label>
+              <select value={data.lengthOfNeed} onChange={(e) => update('lengthOfNeed', e.target.value)} className="w-full border rounded px-3 py-2">
+                <option value="3 months">3 Months</option>
+                <option value="6 months">6 Months</option>
+                <option value="12 months">12 Months</option>
+                <option value="Lifetime">Lifetime</option>
+              </select>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-1">Date Delivered</label>
+              <input type="date" value={data.dateDelivered} onChange={(e) => update('dateDelivered', e.target.value)} className="w-full border rounded px-3 py-2"/>
+            </div>
+
+            <div className="p-4 border-2 border-yellow-400 rounded-lg bg-yellow-50 mb-6">
+              <h4 className="font-bold mb-2">Compliance Statement</h4>
+              <p className="text-sm">This orthosis is not prescribed for comfort or posture correction alone but as part of a structured conservative treatment plan consistent with Aetna CPB #298 and CMS LCD L33802.</p>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Upload Prescription (Optional)</label>
+              <input type="file" ref={rxRef} onChange={handleRxUpload} accept="image/*,application/pdf" className="hidden"/>
+              <button onClick={() => rxRef.current.click()} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"><Upload className="w-5 h-5"/>Upload Rx</button>
+              {patientPrescription && <p className="text-green-600 mt-2">✓ Uploaded</p>}
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <button onClick={() => setStep(4)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
+              <button onClick={() => setStep(6)} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">Continue <ChevronRight className="w-5 h-5"/></button>
+            </div>
+          </div>
+        )}
+
+        {mode === 'intake' && step === 6 && (
+          <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">SIGNATURES</h2>
+            
             <div className="mb-6">
               <h3 className="font-bold mb-2">Provider Attestation</h3>
-              <p className="text-sm mb-3 p-3 bg-gray-50 border rounded">I certify that I personally evaluated the patient and determined the prescribed orthosis is medically necessary.</p>
-              <div className="border-2 rounded bg-white">
-                <canvas ref={providerCanvasRef} width={700} height={150} className="w-full touch-none cursor-crosshair"
+              <div className="text-sm mb-3 p-3 bg-gray-50 border rounded">
+                {providerAttestationText}
+              </div>
+              <div className="border-2 rounded bg-white" style={{touchAction: 'none'}}>
+                <canvas ref={providerCanvasRef} width={700} height={150} className="w-full cursor-crosshair" style={{touchAction: 'none'}}
                   onMouseDown={startDraw(providerCanvasRef)} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
                   onTouchStart={startDraw(providerCanvasRef)} onTouchMove={draw} onTouchEnd={stopDraw}/>
               </div>
@@ -599,11 +876,14 @@ const DMEIntakeSystem = () => {
               </div>
               {signatures.provider && <p className="text-sm text-green-600 mt-2">✓ Saved</p>}
             </div>
+
             <div className="mb-6">
               <h3 className="font-bold mb-2">Patient Acknowledgment</h3>
-              <p className="text-sm mb-3 p-3 bg-gray-50 border rounded">I authorize release of medical information and acknowledge financial responsibility.</p>
-              <div className="border-2 rounded bg-white">
-                <canvas ref={acknowledgmentCanvasRef} width={700} height={150} className="w-full touch-none cursor-crosshair"
+              <div className="text-sm mb-3 p-3 bg-gray-50 border rounded">
+                {patientAcknowledgmentText}
+              </div>
+              <div className="border-2 rounded bg-white" style={{touchAction: 'none'}}>
+                <canvas ref={acknowledgmentCanvasRef} width={700} height={150} className="w-full cursor-crosshair" style={{touchAction: 'none'}}
                   onMouseDown={startDraw(acknowledgmentCanvasRef)} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
                   onTouchStart={startDraw(acknowledgmentCanvasRef)} onTouchMove={draw} onTouchEnd={stopDraw}/>
               </div>
@@ -613,11 +893,14 @@ const DMEIntakeSystem = () => {
               </div>
               {signatures.acknowledgment && <p className="text-sm text-green-600 mt-2">✓ Saved</p>}
             </div>
+
             <div className="mb-6">
               <h3 className="font-bold mb-2">HIPAA Acknowledgment</h3>
-              <p className="text-sm mb-3 p-3 bg-gray-50 border rounded">I acknowledge receipt of Notice of Privacy Practices.</p>
-              <div className="border-2 rounded bg-white">
-                <canvas ref={hipaaCanvasRef} width={700} height={150} className="w-full touch-none cursor-crosshair"
+              <div className="text-sm mb-3 p-3 bg-gray-50 border rounded">
+                {hipaaAcknowledgmentText}
+              </div>
+              <div className="border-2 rounded bg-white" style={{touchAction: 'none'}}>
+                <canvas ref={hipaaCanvasRef} width={700} height={150} className="w-full cursor-crosshair" style={{touchAction: 'none'}}
                   onMouseDown={startDraw(hipaaCanvasRef)} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
                   onTouchStart={startDraw(hipaaCanvasRef)} onTouchMove={draw} onTouchEnd={stopDraw}/>
               </div>
@@ -627,14 +910,15 @@ const DMEIntakeSystem = () => {
               </div>
               {signatures.hipaa && <p className="text-sm text-green-600 mt-2">✓ Saved</p>}
             </div>
+
             <div className="flex justify-between mt-6">
-              <button onClick={() => setStep(4)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
-              <button onClick={() => setStep(6)} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">Continue <ChevronRight className="w-5 h-5"/></button>
+              <button onClick={() => setStep(5)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
+              <button onClick={() => setStep(7)} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">Continue <ChevronRight className="w-5 h-5"/></button>
             </div>
           </div>
         )}
 
-        {mode === 'intake' && step === 6 && (
+        {mode === 'intake' && step === 7 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">PRINT CLAIM PACKET</h2>
             <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 mb-6">
