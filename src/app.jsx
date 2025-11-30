@@ -340,7 +340,7 @@ body{font-family:Arial,sans-serif;font-size:9pt;margin:0;padding:15px}
 .field{margin:3px 0}
 .label{font-weight:bold;display:inline-block;min-width:120px}
 .sig-img{max-height:50px;border-bottom:1px solid #000;margin-top:3px}
-.doc-img{max-width:100%;max-height:200px;border:2px solid #000;margin:10px 0}
+.doc-img{width:100%;max-width:500px;height:auto;border:2px solid #000;margin:10px 0;display:block}
 table{width:100%;border-collapse:collapse;margin:8px 0}
 th,td{border:1px solid #000;padding:5px;text-align:left;font-size:9pt}
 th{background:#e0e0e0;font-weight:bold}
@@ -481,9 +481,24 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
       alert('Please allow popups');
       return;
     }
-    win.document.write(generatePacketHTML());
+    
+    const printButtons = `
+      <div id="print-controls" style="position:fixed;top:0;left:0;right:0;background:#333;padding:15px;display:flex;gap:15px;justify-content:center;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
+        <button onclick="document.getElementById('print-controls').style.display='none';window.print();setTimeout(function(){document.getElementById('print-controls').style.display='flex';},1000);" style="background:#22c55e;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
+          📄 Save / Print PDF
+        </button>
+        <button onclick="window.close();" style="background:#ef4444;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
+          ✕ Close
+        </button>
+      </div>
+      <div style="height:70px;"></div>
+    `;
+    
+    const htmlContent = generatePacketHTML();
+    const modifiedHTML = htmlContent.replace('<body>', '<body>' + printButtons);
+    
+    win.document.write(modifiedHTML);
     win.document.close();
-    win.onload = () => setTimeout(() => {win.focus();win.print()}, 500);
   };
 
   return (
