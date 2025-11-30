@@ -44,7 +44,7 @@ const DMEIntakeSystem = () => {
     }
   };
 
-  // Handle native camera capture with compression
+  // Handle native camera capture with compression and landscape orientation
   const handleNativeCameraCapture = (e, type) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -55,11 +55,28 @@ const DMEIntakeSystem = () => {
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxWidth = 600;
-        const scale = Math.min(maxWidth / img.width, 1);
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Check if image is portrait (taller than wide) and rotate to landscape
+        const isPortrait = img.height > img.width;
+        
+        if (isPortrait) {
+          // Rotate 90 degrees for landscape
+          const scale = Math.min(maxWidth / img.height, 1);
+          canvas.width = img.height * scale;
+          canvas.height = img.width * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(90 * Math.PI / 180);
+          ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+          // Already landscape
+          const scale = Math.min(maxWidth / img.width, 1);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        
         const compressedData = canvas.toDataURL('image/jpeg', 0.8);
         
         if (type === 'insurance') {
@@ -181,19 +198,19 @@ const DMEIntakeSystem = () => {
 
   const [data, setData] = useState({
     firstName: '', lastName: '', middleName: '', age: '', dob: '', sex: '', 
-    address: '', city: '', state: '', zip: '', phone: '', email: '', employer: '',
+    address: '', city: '', state: 'NJ', zip: '', phone: '', email: '', employer: '',
     primaryIns: '', primaryID: '', primaryGroup: '',
-    complaints: [], onsetDate: '', duration: '', painLevel: '6', painDesc: [],
-    limitations: [], priorCare: [], medicalHistory: [],
-    device: [], dateDelivered: '', patientInitials: '',
+    complaints: ['lbp'], onsetDate: '', duration: 'Chronic (>3 mo)', painLevel: '6', painDesc: [],
+    limitations: ['Difficulty standing'], priorCare: ['Home Treatment'], medicalHistory: ['No Significant Medical History'],
+    device: ['L0631', 'E0730'], dateDelivered: '', patientInitials: '',
     primaryICD: 'M54.50',
     additionalICD: [],
-    postureGait: '',
-    lumbarMobility: '',
-    painBehavior: [],
-    functionalImpact: [],
+    postureGait: 'Guarded',
+    lumbarMobility: 'Moderate Restriction',
+    painBehavior: ['Pain on Movement'],
+    functionalImpact: ['Difficulty Standing/Sitting'],
     otherNotes: '',
-    mechanicalLBPFindings: false,
+    mechanicalLBPFindings: true,
     lengthOfNeed: '3 months'
   });
 
@@ -287,18 +304,30 @@ const DMEIntakeSystem = () => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Compress the image
     const reader = new FileReader();
     reader.onload = (evt) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxWidth = 600;
-        const scale = maxWidth / img.width;
-        canvas.width = maxWidth;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const isPortrait = img.height > img.width;
+        
+        if (isPortrait) {
+          const scale = Math.min(maxWidth / img.height, 1);
+          canvas.width = img.height * scale;
+          canvas.height = img.width * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(90 * Math.PI / 180);
+          ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+          const scale = Math.min(maxWidth / img.width, 1);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        
         const compressedData = canvas.toDataURL('image/jpeg', 0.8);
         setInsuranceCardImg(compressedData);
       };
@@ -311,18 +340,30 @@ const DMEIntakeSystem = () => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Compress the image
     const reader = new FileReader();
     reader.onload = (evt) => {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const maxWidth = 600;
-        const scale = maxWidth / img.width;
-        canvas.width = maxWidth;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const isPortrait = img.height > img.width;
+        
+        if (isPortrait) {
+          const scale = Math.min(maxWidth / img.height, 1);
+          canvas.width = img.height * scale;
+          canvas.height = img.width * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(90 * Math.PI / 180);
+          ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+          const scale = Math.min(maxWidth / img.width, 1);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        
         const compressedData = canvas.toDataURL('image/jpeg', 0.8);
         setDriversLicenseImg(compressedData);
       };
@@ -416,19 +457,19 @@ const DMEIntakeSystem = () => {
       
       setData({
         firstName: '', lastName: '', middleName: '', age: '', dob: '', sex: '', 
-        address: '', city: '', state: '', zip: '', phone: '', email: '', employer: '',
+        address: '', city: '', state: 'NJ', zip: '', phone: '', email: '', employer: '',
         primaryIns: '', primaryID: '', primaryGroup: '',
-        complaints: [], onsetDate: eventDate, duration: '', painLevel: '6', painDesc: [],
-        limitations: [], priorCare: [], medicalHistory: [],
-        device: [], dateDelivered: eventDate, patientInitials: '',
+        complaints: ['lbp'], onsetDate: eventDate, duration: 'Chronic (>3 mo)', painLevel: '6', painDesc: [],
+        limitations: ['Difficulty standing'], priorCare: ['Home Treatment'], medicalHistory: ['No Significant Medical History'],
+        device: ['L0631', 'E0730'], dateDelivered: eventDate, patientInitials: '',
         primaryICD: 'M54.50',
         additionalICD: [],
-        postureGait: '',
-        lumbarMobility: '',
-        painBehavior: [],
-        functionalImpact: [],
+        postureGait: 'Guarded',
+        lumbarMobility: 'Moderate Restriction',
+        painBehavior: ['Pain on Movement'],
+        functionalImpact: ['Difficulty Standing/Sitting'],
         otherNotes: '',
-        mechanicalLBPFindings: false,
+        mechanicalLBPFindings: true,
         lengthOfNeed: '3 months'
       });
       setSigs({provider: null, acknowledgment: null, hipaa: null});
@@ -794,7 +835,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               </div>
               <div className="grid md:grid-cols-3 gap-4">
                 <div><label className="block text-sm font-medium mb-1">DOB *</label><input type="date" value={data.dob} onChange={(e) => {update('dob', e.target.value);const age = Math.floor((new Date() - new Date(e.target.value)) / 31557600000);update('age', age.toString());}} max={new Date().toISOString().split('T')[0]} className="w-full border rounded px-3 py-2"/></div>
-                <div><label className="block text-sm font-medium mb-1">Age</label><input type="text" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100" style={{fontSize: '16px'}}/></div>
+                <div><label className="block text-sm font-medium mb-1">Age</label><input type="text" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100 h-[42px]"/></div>
                 <div><label className="block text-sm font-medium mb-1">Sex *</label><div className="flex gap-4 mt-2"><label className="flex items-center"><input type="radio" value="M" checked={data.sex === 'M'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Male</label><label className="flex items-center"><input type="radio" value="F" checked={data.sex === 'F'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Female</label></div></div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
