@@ -548,15 +548,21 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
     }
     
     const printButtons = `
+      <style>
+        @media print {
+          #print-controls { display: none !important; }
+          #print-spacer { display: none !important; }
+        }
+      </style>
       <div id="print-controls" style="position:fixed;top:0;left:0;right:0;background:#333;padding:15px;display:flex;gap:15px;justify-content:center;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
-        <button onclick="document.getElementById('print-controls').style.display='none';window.print();setTimeout(function(){document.getElementById('print-controls').style.display='flex';},1000);" style="background:#22c55e;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
+        <button onclick="window.print();" style="background:#22c55e;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
           📄 Save / Print PDF
         </button>
         <button onclick="window.close();" style="background:#ef4444;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
           ✕ Close
         </button>
       </div>
-      <div style="height:70px;"></div>
+      <div id="print-spacer" style="height:70px;"></div>
     `;
     
     const htmlContent = generatePacketHTML();
