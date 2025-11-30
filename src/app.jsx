@@ -29,8 +29,7 @@ const DMEIntakeSystem = () => {
   const acknowledgmentCanvasRef = useRef(null);
   const hipaaCanvasRef = useRef(null);
 
-  const startCardCapture = async (type) => {
-    // First ensure any existing stream is stopped
+  const cleanupCamera = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
         track.stop();
@@ -38,23 +37,34 @@ const DMEIntakeSystem = () => {
       });
       streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  const startCardCapture = async (type) => {
+    // First ensure any existing stream is fully stopped
+    cleanupCamera();
     
     setShowCardCapture(type);
     
-    // Small delay to ensure cleanup is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Longer delay to ensure iOS releases the camera
+    await new Promise(resolve => setTimeout(resolve, 300));
     
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
       });
       streamRef.current = stream;
+      // Wait for video element to be ready
+      await new Promise(resolve => setTimeout(resolve, 100));
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
       }
     } catch (err) {
       console.error('Camera error:', err);
-      alert('Could not access camera. Please use file upload instead.');
+      alert('Could not access camera. Please try again or use file upload.');
       setShowCardCapture(null);
     }
   };
@@ -95,29 +105,14 @@ const DMEIntakeSystem = () => {
   };
 
   const stopCardCapture = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-        track.enabled = false;
-      });
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
+    cleanupCamera();
     setShowCardCapture(null);
   };
 
   // Cleanup camera on unmount or mode change
   useEffect(() => {
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-          track.enabled = false;
-        });
-        streamRef.current = null;
-      }
+      cleanupCamera();
     };
   }, [mode]);
   
@@ -382,6 +377,9 @@ const DMEIntakeSystem = () => {
 
   const startNewPatient = () => {
     if (window.confirm('Start new patient for this event?')) {
+      // Clean up camera first
+      cleanupCamera();
+      
       setData({
         firstName: '', lastName: '', middleName: '', age: '', dob: '', sex: '', 
         address: '', city: '', state: '', zip: '', phone: '', email: '', employer: '',
@@ -405,6 +403,7 @@ const DMEIntakeSystem = () => {
       setPatientPrescription(null);
       setAutoRouted(false);
       setCompany(null);
+      setShowCardCapture(null);
       setMode('capture');
       setStep(0);
     }
