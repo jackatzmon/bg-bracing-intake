@@ -21,6 +21,8 @@ const DMEIntakeSystem = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const nativeCameraInsRef = useRef(null);
+  const nativeCameraDLRef = useRef(null);
   
   const insCardRef = useRef(null);
   const dlRef = useRef(null);
@@ -40,6 +42,38 @@ const DMEIntakeSystem = () => {
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
+  };
+
+  // Handle native camera capture with compression
+  const handleNativeCameraCapture = (e, type) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 600;
+        const scale = Math.min(maxWidth / img.width, 1);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        if (type === 'insurance') {
+          setInsuranceCardImg(compressedData);
+        } else {
+          setDriversLicenseImg(compressedData);
+        }
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset the input so the same file can be selected again
+    e.target.value = '';
   };
 
   const startCardCapture = async (type) => {
@@ -700,12 +734,13 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
             <div className="mb-8 p-6 border-2 border-blue-300 rounded-lg bg-blue-50">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Camera className="w-6 h-6"/>Insurance Card (Optional)</h2>
               <input type="file" ref={insCardRef} onChange={handleInsCardUpload} accept="image/*" className="hidden"/>
-              <div className="flex gap-3">
-                <button onClick={() => startCardCapture('insurance')} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
-                  <Camera className="w-5 h-5"/>{insuranceCardImg ? 'Retake' : 'Capture'} Card
+              <input type="file" ref={nativeCameraInsRef} onChange={(e) => handleNativeCameraCapture(e, 'insurance')} accept="image/*" capture="environment" className="hidden"/>
+              <div className="flex gap-3 flex-wrap">
+                <button onClick={() => nativeCameraInsRef.current.click()} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
+                  <Camera className="w-5 h-5"/>{insuranceCardImg ? 'Retake' : 'Take Photo'}
                 </button>
                 <button onClick={() => insCardRef.current.click()} className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600">
-                  Upload File
+                  Choose from Library
                 </button>
               </div>
               {insuranceCardImg && <div className="mt-4"><img src={insuranceCardImg} alt="Insurance" className="max-w-xs rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-2">✓ Captured</p></div>}
@@ -714,12 +749,13 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
             <div className="mb-8 p-6 border-2 rounded-lg">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Scan className="w-6 h-6"/>Driver's License (Optional)</h2>
               <input type="file" ref={dlRef} onChange={handleDLUpload} accept="image/*" className="hidden"/>
-              <div className="flex gap-3">
-                <button onClick={() => startCardCapture('license')} className="bg-gray-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-700">
-                  <Camera className="w-5 h-5"/>{driversLicenseImg ? 'Retake' : 'Capture'} License
+              <input type="file" ref={nativeCameraDLRef} onChange={(e) => handleNativeCameraCapture(e, 'license')} accept="image/*" capture="environment" className="hidden"/>
+              <div className="flex gap-3 flex-wrap">
+                <button onClick={() => nativeCameraDLRef.current.click()} className="bg-gray-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-700">
+                  <Camera className="w-5 h-5"/>{driversLicenseImg ? 'Retake' : 'Take Photo'}
                 </button>
                 <button onClick={() => dlRef.current.click()} className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600">
-                  Upload File
+                  Choose from Library
                 </button>
               </div>
               {driversLicenseImg && <div className="mt-4"><img src={driversLicenseImg} alt="License" className="max-w-xs rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-2">✓ Captured</p></div>}
@@ -729,53 +765,6 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               <button onClick={changeEvent} className="flex-1 bg-gray-200 px-6 py-3 rounded-lg hover:bg-gray-300">← Change Event</button>
               <button onClick={() => {setMode('intake');setStep(1);}} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2">Continue <ChevronRight className="w-5 h-5"/></button>
             </div>
-          </div>
-        )}
-
-        {/* Card Capture Overlay */}
-        {showCardCapture && (
-          <div className="fixed inset-0 bg-black z-50 flex flex-col">
-            <div className="bg-gray-900 p-4 flex justify-between items-center">
-              <h2 className="text-white text-lg font-bold">
-                {showCardCapture === 'insurance' ? 'Capture Insurance Card' : 'Capture Driver\'s License'}
-              </h2>
-              <button onClick={stopCardCapture} className="text-white bg-red-600 px-4 py-2 rounded-lg">Cancel</button>
-            </div>
-            
-            <div className="flex-1 relative overflow-hidden">
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                className="absolute inset-0 w-full h-full object-cover"
-              />
-              
-              {/* Card Frame Overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* Dark overlay with transparent card cutout */}
-                <div className="absolute inset-0 bg-black bg-opacity-50"/>
-                
-                {/* Card frame */}
-                <div className="relative z-10 w-4/5 max-w-md aspect-[1.59/1] border-4 border-white rounded-xl shadow-lg">
-                  <div className="absolute inset-0 border-2 border-dashed border-white border-opacity-50 rounded-lg m-2"/>
-                  <div className="absolute -top-8 left-0 right-0 text-center text-white text-sm font-medium">
-                    Align card within frame
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-gray-900 p-6 flex justify-center">
-              <button 
-                onClick={captureCard}
-                className="bg-white text-black px-8 py-4 rounded-full text-xl font-bold flex items-center gap-2 hover:bg-gray-200"
-              >
-                <Camera className="w-6 h-6"/> Capture
-              </button>
-            </div>
-            
-            {/* Hidden canvas for image processing */}
-            <canvas ref={canvasRef} className="hidden"/>
           </div>
         )}
 
