@@ -78,49 +78,54 @@ const DMEIntakeSystem = () => {
     update(field, arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
   };
 
-  // Auto-save to localStorage every time data changes
+  // Auto-save to localStorage every time data changes (excluding large images)
   useEffect(() => {
     if (mode === 'intake' && step > 0) {
-      const saveData = {
-        mode,
-        step,
-        company,
-        eventDate,
-        eventName,
-        data,
-        signatures,
-        insuranceCardImg,
-        driversLicenseImg,
-        patientPrescription,
-        autoRouted,
-        timestamp: new Date().toISOString()
-      };
-      localStorage.setItem('dme-intake-current', JSON.stringify(saveData));
-      setLastSaved(new Date().toLocaleTimeString());
+      try {
+        const saveData = {
+          mode,
+          step,
+          company,
+          eventDate,
+          eventName,
+          data,
+          signatures,
+          autoRouted,
+          hasInsuranceCard: !!insuranceCardImg,
+          hasDriversLicense: !!driversLicenseImg,
+          hasRx: !!patientPrescription,
+          timestamp: new Date().toISOString()
+        };
+        localStorage.setItem('dme-intake-current', JSON.stringify(saveData));
+        setLastSaved(new Date().toLocaleTimeString());
+      } catch (e) {
+        console.error('Error saving to localStorage:', e);
+      }
     }
-  }, [data, step, mode, signatures, company, eventDate, eventName, insuranceCardImg, driversLicenseImg, patientPrescription, autoRouted]);
+  }, [data, step, mode, signatures, company, eventDate, eventName, autoRouted]);
 
-  // Load saved data on mount
+  // Load saved data on mount (images are not saved, only form data)
   useEffect(() => {
     const saved = localStorage.getItem('dme-intake-current');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (window.confirm(`Resume saved session from ${new Date(parsed.timestamp).toLocaleString()}?`)) {
+        if (window.confirm(`Resume saved session from ${new Date(parsed.timestamp).toLocaleString()}?\n\n(Note: Photos will need to be retaken)`)) {
           setMode(parsed.mode);
           setStep(parsed.step);
           setCompany(parsed.company);
           setEventDate(parsed.eventDate);
           setEventName(parsed.eventName);
           setData(parsed.data);
-          setSigs(parsed.signatures);
-          setInsuranceCardImg(parsed.insuranceCardImg);
-          setDriversLicenseImg(parsed.driversLicenseImg);
-          setPatientPrescription(parsed.patientPrescription);
+          setSigs(parsed.signatures || {provider: null, acknowledgment: null, hipaa: null});
           setAutoRouted(parsed.autoRouted);
+          // Images are not restored - they need to be retaken
+        } else {
+          localStorage.removeItem('dme-intake-current');
         }
       } catch (e) {
         console.error('Error loading saved data:', e);
+        localStorage.removeItem('dme-intake-current');
       }
     }
   }, []);
