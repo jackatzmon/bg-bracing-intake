@@ -935,32 +935,36 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               <p className="text-green-700"><strong>Billing To:</strong> {company ? companies[company].name : 'Not selected'}</p>
             </div>
 
-            {/* Checklist */}
+            {/* Checklist - clickable to jump to step */}
             <div className="bg-gray-50 border rounded-lg p-4 mb-6">
-              <h4 className="font-bold mb-3">Checklist:</h4>
+              <h4 className="font-bold mb-3">Checklist (tap to edit):</h4>
               <div className="space-y-2 text-sm">
-                <div className={data.firstName && data.lastName ? 'text-green-600' : 'text-red-600'}>
-                  {data.firstName && data.lastName ? '✓' : '✗'} Patient name
+                <div onClick={() => setStep(1)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${data.firstName && data.lastName ? 'text-green-600' : 'text-red-600'}`}>
+                  {data.firstName && data.lastName ? '✓' : '✗'} Patient name → Step 1
                 </div>
-                <div className={data.primaryIns ? 'text-green-600' : 'text-red-600'}>
-                  {data.primaryIns ? '✓' : '✗'} Insurance selected
+                <div onClick={() => setStep(2)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${data.primaryIns ? 'text-green-600' : 'text-red-600'}`}>
+                  {data.primaryIns ? '✓' : '✗'} Insurance selected → Step 2
                 </div>
-                <div className={data.device.length > 0 ? 'text-green-600' : 'text-red-600'}>
-                  {data.device.length > 0 ? '✓' : '✗'} Device selected
+                <div onClick={() => setStep(5)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${data.device.length > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {data.device.length > 0 ? '✓' : '✗'} Device selected → Step 5
                 </div>
-                <div className={data.patientInitials ? 'text-green-600' : 'text-red-600'}>
-                  {data.patientInitials ? '✓' : '✗'} Patient initials
+                <div onClick={() => setStep(5)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${data.patientInitials ? 'text-green-600' : 'text-red-600'}`}>
+                  {data.patientInitials ? '✓' : '✗'} Patient initials → Step 5
                 </div>
-                <div className={signatures.provider ? 'text-green-600' : 'text-red-600'}>
-                  {signatures.provider ? '✓' : '✗'} Provider signature
+                <div onClick={() => setStep(6)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${signatures.provider ? 'text-green-600' : 'text-red-600'}`}>
+                  {signatures.provider ? '✓' : '✗'} Provider signature → Step 6
                 </div>
-                <div className={signatures.acknowledgment ? 'text-green-600' : 'text-red-600'}>
-                  {signatures.acknowledgment ? '✓' : '✗'} Patient signature
+                <div onClick={() => setStep(6)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${signatures.acknowledgment ? 'text-green-600' : 'text-red-600'}`}>
+                  {signatures.acknowledgment ? '✓' : '✗'} Patient signature → Step 6
                 </div>
-                <div className={signatures.hipaa ? 'text-green-600' : 'text-yellow-600'}>
-                  {signatures.hipaa ? '✓' : '○'} HIPAA signature (optional)
+                <div onClick={() => setStep(6)} className={`cursor-pointer hover:bg-gray-200 p-2 rounded ${signatures.hipaa ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {signatures.hipaa ? '✓' : '○'} HIPAA signature (optional) → Step 6
                 </div>
               </div>
+            </div>
+
+            <div className="flex justify-between mb-4">
+              <button onClick={() => setStep(6)} className="bg-gray-200 px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-300"><ChevronLeft className="w-5 h-5"/>Back</button>
             </div>
 
             <button onClick={handlePrint} className="w-full bg-green-600 text-white px-6 py-4 rounded-lg text-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 mb-4">
