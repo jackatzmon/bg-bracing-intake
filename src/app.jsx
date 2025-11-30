@@ -7,7 +7,8 @@ const DMEIntakeSystem = () => {
   const [company, setCompany] = useState(null);
   const [eventDate, setEventDate] = useState('');
   const [eventName, setEventName] = useState('');
-  const [insuranceCardImg, setInsuranceCardImg] = useState(null);
+  const [insuranceCardFrontImg, setInsuranceCardFrontImg] = useState(null);
+  const [insuranceCardBackImg, setInsuranceCardBackImg] = useState(null);
   const [driversLicenseImg, setDriversLicenseImg] = useState(null);
   const [autoRouted, setAutoRouted] = useState(false);
   const [signatures, setSigs] = useState({provider: null, acknowledgment: null, hipaa: null});
@@ -17,14 +18,16 @@ const DMEIntakeSystem = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSaved, setLastSaved] = useState(null);
   
-  const [showCardCapture, setShowCardCapture] = useState(null); // 'insurance' or 'license'
+  const [showCardCapture, setShowCardCapture] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const nativeCameraInsRef = useRef(null);
+  const nativeCameraInsFrontRef = useRef(null);
+  const nativeCameraInsBackRef = useRef(null);
   const nativeCameraDLRef = useRef(null);
   
-  const insCardRef = useRef(null);
+  const insCardFrontRef = useRef(null);
+  const insCardBackRef = useRef(null);
   const dlRef = useRef(null);
   const rxRef = useRef(null);
   const providerCanvasRef = useRef(null);
@@ -79,9 +82,11 @@ const DMEIntakeSystem = () => {
         
         const compressedData = canvas.toDataURL('image/jpeg', 0.8);
         
-        if (type === 'insurance') {
-          setInsuranceCardImg(compressedData);
-        } else {
+        if (type === 'insuranceFront') {
+          setInsuranceCardFrontImg(compressedData);
+        } else if (type === 'insuranceBack') {
+          setInsuranceCardBackImg(compressedData);
+        } else if (type === 'license') {
           setDriversLicenseImg(compressedData);
         }
       };
@@ -170,12 +175,14 @@ const DMEIntakeSystem = () => {
   const companies = {
     bgbracing: {
       name: 'BG Bracing, LLC',
-      address: '84 Hopper Avenue',
+      address: '84 Hopper Ave.',
       city: 'Pompton Plains',
       state: 'NJ',
-      zip: '07457',
+      zip: '07444',
       phone: '(973) 363-9011',
       fax: '(973) 341-7791',
+      email: 'bgbracinggear@gmail.com',
+      website: 'www.bracinggear.com',
       npi: '1234567890',
       taxId: '12-3456789',
       referringProvider: 'Dr. Jack Atzmon, DC',
@@ -183,12 +190,14 @@ const DMEIntakeSystem = () => {
     },
     njback: {
       name: 'NJback Chiropractic Center, LLC',
-      address: '84 Hopper Avenue',
-      city: 'Pompton Plains',
+      address: '47 Hamburg Turnpike',
+      city: 'Riverdale',
       state: 'NJ',
       zip: '07457',
-      phone: '(973) 363-9011',
+      phone: '(973) 874-9777',
       fax: '(973) 341-7791',
+      email: 'info@njback.com',
+      website: 'www.njback.com',
       npi: '1720184498',
       taxId: '81-4921270',
       referringProvider: 'Dr. Jack Atzmon, DC',
@@ -234,7 +243,8 @@ const DMEIntakeSystem = () => {
           data,
           signatures,
           autoRouted,
-          hasInsuranceCard: !!insuranceCardImg,
+          hasInsuranceCardFront: !!insuranceCardFrontImg,
+          hasInsuranceCardBack: !!insuranceCardBackImg,
           hasDriversLicense: !!driversLicenseImg,
           hasRx: !!patientPrescription,
           timestamp: new Date().toISOString()
@@ -300,7 +310,7 @@ const DMEIntakeSystem = () => {
     }
   };
 
-  const handleInsCardUpload = (e) => {
+  const handleInsCardFrontUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
@@ -329,7 +339,43 @@ const DMEIntakeSystem = () => {
         }
         
         const compressedData = canvas.toDataURL('image/jpeg', 0.8);
-        setInsuranceCardImg(compressedData);
+        setInsuranceCardFrontImg(compressedData);
+      };
+      img.src = evt.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleInsCardBackUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 600;
+        const isPortrait = img.height > img.width;
+        
+        if (isPortrait) {
+          const scale = Math.min(maxWidth / img.height, 1);
+          canvas.width = img.height * scale;
+          canvas.height = img.width * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(90 * Math.PI / 180);
+          ctx.drawImage(img, -img.width * scale / 2, -img.height * scale / 2, img.width * scale, img.height * scale);
+        } else {
+          const scale = Math.min(maxWidth / img.width, 1);
+          canvas.width = img.width * scale;
+          canvas.height = img.height * scale;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        
+        const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+        setInsuranceCardBackImg(compressedData);
       };
       img.src = evt.target.result;
     };
@@ -473,7 +519,8 @@ const DMEIntakeSystem = () => {
         lengthOfNeed: '3 months'
       });
       setSigs({provider: null, acknowledgment: null, hipaa: null});
-      setInsuranceCardImg(null);
+      setInsuranceCardFrontImg(null);
+      setInsuranceCardBackImg(null);
       setDriversLicenseImg(null);
       setPatientPrescription(null);
       setAutoRouted(false);
@@ -493,7 +540,8 @@ const DMEIntakeSystem = () => {
       setEventName('');
       setCompany(null);
       setAutoRouted(false);
-      setInsuranceCardImg(null);
+      setInsuranceCardFrontImg(null);
+      setInsuranceCardBackImg(null);
       setDriversLicenseImg(null);
       setPatientPrescription(null);
       setData({
@@ -558,15 +606,19 @@ li{margin:2px 0}
 
 <div class="header">
 <div class="company-name">${companyInfo.name}</div>
-<div>${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div>
-<div>Phone: ${companyInfo.phone} | Fax: ${companyInfo.fax} | NPI: ${companyInfo.npi}</div>
-<div style="margin-top:8px;font-size:12pt;font-weight:bold">DME CLAIM PACKET</div>
-<div>Date of Service: ${today}</div>
+<div style="font-size:10pt;margin-top:4px;">${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div>
+<div style="margin-top:6px;">
+<span style="margin-right:15px;">📞 ${companyInfo.phone}</span>
+<span style="margin-right:15px;">📠 ${companyInfo.fax}</span>
 </div>
-
-${insuranceCardImg ? `<div class="section-title">INSURANCE CARD</div><div><img src="${insuranceCardImg}" class="doc-img"/></div>` : ''}
-
-${driversLicenseImg ? `<div class="section-title">DRIVER'S LICENSE</div><div><img src="${driversLicenseImg}" class="doc-img"/></div>` : ''}
+<div style="margin-top:4px;">
+<span style="margin-right:15px;">✉️ ${companyInfo.email}</span>
+<span>🌐 ${companyInfo.website}</span>
+</div>
+<div style="margin-top:4px;font-size:9pt;color:#555;">NPI: ${companyInfo.npi}</div>
+<div style="margin-top:12px;font-size:14pt;font-weight:bold;background:#333;color:white;padding:8px;border-radius:4px;">DME CLAIM PACKET</div>
+<div style="margin-top:6px;font-size:11pt;">Date of Service: <strong>${today}</strong></div>
+</div>
 
 <div class="section-title">PATIENT INFORMATION</div>
 <div class="grid-2">
@@ -671,6 +723,23 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
 <div class="field"><span class="label">Date:</span> ${today}</div>
 </div>
 
+<div style="page-break-before: always;"></div>
+
+<div class="section-title">SUPPORTING DOCUMENTS</div>
+
+${insuranceCardFrontImg || insuranceCardBackImg ? `
+<div class="subsection-title">Insurance Card</div>
+<div class="grid-2">
+${insuranceCardFrontImg ? `<div><div style="font-size:8pt;margin-bottom:4px;"><strong>Front:</strong></div><img src="${insuranceCardFrontImg}" class="doc-img"/></div>` : ''}
+${insuranceCardBackImg ? `<div><div style="font-size:8pt;margin-bottom:4px;"><strong>Back:</strong></div><img src="${insuranceCardBackImg}" class="doc-img"/></div>` : ''}
+</div>
+` : ''}
+
+${driversLicenseImg ? `
+<div class="subsection-title">Driver's License</div>
+<div><img src="${driversLicenseImg}" class="doc-img"/></div>
+` : ''}
+
 </body></html>`;
   };
 
@@ -774,17 +843,38 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
 
             <div className="mb-8 p-6 border-2 border-blue-300 rounded-lg bg-blue-50">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Camera className="w-6 h-6"/>Insurance Card (Optional)</h2>
-              <input type="file" ref={insCardRef} onChange={handleInsCardUpload} accept="image/*" className="hidden"/>
-              <input type="file" ref={nativeCameraInsRef} onChange={(e) => handleNativeCameraCapture(e, 'insurance')} accept="image/*" capture="environment" className="hidden"/>
-              <div className="flex gap-3 flex-wrap">
-                <button onClick={() => nativeCameraInsRef.current.click()} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
-                  <Camera className="w-5 h-5"/>{insuranceCardImg ? 'Retake' : 'Take Photo'}
-                </button>
-                <button onClick={() => insCardRef.current.click()} className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600">
-                  Choose from Library
-                </button>
+              
+              {/* Front of card */}
+              <div className="mb-4">
+                <p className="font-medium mb-2">Front of Card:</p>
+                <input type="file" ref={insCardFrontRef} onChange={handleInsCardFrontUpload} accept="image/*" className="hidden"/>
+                <input type="file" ref={nativeCameraInsFrontRef} onChange={(e) => handleNativeCameraCapture(e, 'insuranceFront')} accept="image/*" capture="environment" className="hidden"/>
+                <div className="flex gap-3 flex-wrap">
+                  <button onClick={() => nativeCameraInsFrontRef.current.click()} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
+                    <Camera className="w-5 h-5"/>{insuranceCardFrontImg ? 'Retake' : 'Take Photo'}
+                  </button>
+                  <button onClick={() => insCardFrontRef.current.click()} className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600">
+                    Choose from Library
+                  </button>
+                </div>
+                {insuranceCardFrontImg && <div className="mt-2"><img src={insuranceCardFrontImg} alt="Insurance Front" className="max-w-xs rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-1">✓ Front Captured</p></div>}
               </div>
-              {insuranceCardImg && <div className="mt-4"><img src={insuranceCardImg} alt="Insurance" className="max-w-xs rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-2">✓ Captured</p></div>}
+              
+              {/* Back of card */}
+              <div>
+                <p className="font-medium mb-2">Back of Card:</p>
+                <input type="file" ref={insCardBackRef} onChange={handleInsCardBackUpload} accept="image/*" className="hidden"/>
+                <input type="file" ref={nativeCameraInsBackRef} onChange={(e) => handleNativeCameraCapture(e, 'insuranceBack')} accept="image/*" capture="environment" className="hidden"/>
+                <div className="flex gap-3 flex-wrap">
+                  <button onClick={() => nativeCameraInsBackRef.current.click()} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
+                    <Camera className="w-5 h-5"/>{insuranceCardBackImg ? 'Retake' : 'Take Photo'}
+                  </button>
+                  <button onClick={() => insCardBackRef.current.click()} className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600">
+                    Choose from Library
+                  </button>
+                </div>
+                {insuranceCardBackImg && <div className="mt-2"><img src={insuranceCardBackImg} alt="Insurance Back" className="max-w-xs rounded border-2 border-green-500"/><p className="text-green-600 font-bold mt-1">✓ Back Captured</p></div>}
+              </div>
             </div>
 
             <div className="mb-8 p-6 border-2 rounded-lg">
@@ -859,7 +949,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
         {mode === 'intake' && step === 2 && (
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">INSURANCE INFORMATION</h2>
-            {insuranceCardImg && <div className="mb-6"><img src={insuranceCardImg} alt="Insurance" className="max-w-sm rounded border"/></div>}
+            {insuranceCardFrontImg && <div className="mb-6"><img src={insuranceCardFrontImg} alt="Insurance Front" className="max-w-sm rounded border"/></div>}
             <div className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4">
                 <div><label className="block text-sm font-medium mb-1">Primary Insurance *</label>
