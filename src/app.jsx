@@ -83,11 +83,30 @@ const DMEIntakeSystem = () => {
 
   const stopCardCapture = () => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
     setShowCardCapture(null);
   };
+
+  // Cleanup camera on unmount or mode change
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+        streamRef.current = null;
+      }
+    };
+  }, [mode]);
   
   const companies = {
     bgbracing: {
@@ -547,6 +566,8 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
       return;
     }
     
+    const fileName = `${data.lastName}_${data.firstName}_${eventDate}`;
+    
     const printButtons = `
       <style>
         @media print {
@@ -554,6 +575,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
           #print-spacer { display: none !important; }
         }
       </style>
+      <title>${fileName}</title>
       <div id="print-controls" style="position:fixed;top:0;left:0;right:0;background:#333;padding:15px;display:flex;gap:15px;justify-content:center;z-index:9999;box-shadow:0 2px 10px rgba(0,0,0,0.3);">
         <button onclick="window.print();" style="background:#22c55e;color:white;border:none;padding:12px 30px;font-size:16px;font-weight:bold;border-radius:8px;cursor:pointer;">
           📄 Save / Print PDF
@@ -566,7 +588,10 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
     `;
     
     const htmlContent = generatePacketHTML();
-    const modifiedHTML = htmlContent.replace('<body>', '<body>' + printButtons);
+    // Replace the title in the HTML
+    const modifiedHTML = htmlContent
+      .replace(/<title>.*?<\/title>/, `<title>${fileName}</title>`)
+      .replace('<body>', '<body>' + printButtons);
     
     win.document.write(modifiedHTML);
     win.document.close();
@@ -740,7 +765,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               </div>
               <div className="grid md:grid-cols-3 gap-4">
                 <div><label className="block text-sm font-medium mb-1">DOB *</label><input type="date" value={data.dob} onChange={(e) => {update('dob', e.target.value);const age = Math.floor((new Date() - new Date(e.target.value)) / 31557600000);update('age', age.toString());}} max={new Date().toISOString().split('T')[0]} className="w-full border rounded px-3 py-2"/></div>
-                <div><label className="block text-sm font-medium mb-1">Age</label><input type="number" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100"/></div>
+                <div><label className="block text-sm font-medium mb-1">Age</label><input type="text" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100"/></div>
                 <div><label className="block text-sm font-medium mb-1">Sex *</label><div className="flex gap-4 mt-2"><label className="flex items-center"><input type="radio" value="M" checked={data.sex === 'M'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Male</label><label className="flex items-center"><input type="radio" value="F" checked={data.sex === 'F'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Female</label></div></div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
