@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, ChevronRight, ChevronLeft, Printer, Upload, Scan, Wifi, WifiOff, FolderOpen, Send, Check, Cloud } from 'lucide-react';
+import { Camera, ChevronRight, ChevronLeft, Printer, Upload, Scan, Wifi, WifiOff } from 'lucide-react';
 
 const DMEIntakeSystem = () => {
   const [mode, setMode] = useState('setup');
@@ -16,12 +16,6 @@ const DMEIntakeSystem = () => {
   const [patientPrescription, setPatientPrescription] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [lastSaved, setLastSaved] = useState(null);
-  const [savedPatients, setSavedPatients] = useState([]);
-  const [savingToDrive, setSavingToDrive] = useState(false);
-  const [driveConnected, setDriveConnected] = useState(false);
-  const [accessToken, setAccessToken] = useState(null);
-  const [currentFolderId, setCurrentFolderId] = useState(null);
-  const [billerEmail, setBillerEmail] = useState(localStorage.getItem('billerEmail') || '');
   
   const insCardRef = useRef(null);
   const dlRef = useRef(null);
@@ -29,11 +23,6 @@ const DMEIntakeSystem = () => {
   const providerCanvasRef = useRef(null);
   const acknowledgmentCanvasRef = useRef(null);
   const hipaaCanvasRef = useRef(null);
-
-  // Google OAuth Configuration - Replace with your credentials
-  const GOOGLE_CLIENT_ID = '614894762456-msbcf8h1kgstkogbimdmqt9dh2u1b210.apps.googleusercontent.com';
-  const GOOGLE_API_KEY = 'AIzaSyD7Bb-xrjEtf4I6lH4ojivveK_MR3Weeak';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
   
   const companies = {
     bgbracing: {
@@ -51,16 +40,16 @@ const DMEIntakeSystem = () => {
     },
     njback: {
       name: 'NJback Chiropractic Center, LLC',
-      address: '456 Wellness Ave',
-      city: 'Your City',
+      address: '84 Hopper Avenue',
+      city: 'Pompton Plains',
       state: 'NJ',
-      zip: '07002',
-      phone: '(555) 987-6543',
-      fax: '(555) 987-6544',
-      npi: '0987654321',
-      taxId: '98-7654321',
-      referringProvider: 'Dr. Your Name, DC',
-      referringNPI: '1234567890'
+      zip: '07457',
+      phone: '(973) 363-9011',
+      fax: '(973) 341-7791',
+      npi: '1720184498',
+      taxId: '81-4921270',
+      referringProvider: 'Dr. Jack Atzmon, DC',
+      referringNPI: '1962565648'
     }
   };
 
@@ -89,199 +78,6 @@ const DMEIntakeSystem = () => {
     update(field, arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]);
   };
 
-  // Load Google API
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = () => {
-      window.gapi.load('client:auth2', initGoogleClient);
-    };
-    document.body.appendChild(script);
-  }, []);
-
-  const initGoogleClient = async () => {
-    try {
-      await window.gapi.client.init({
-        apiKey: GOOGLE_API_KEY,
-        clientId: GOOGLE_CLIENT_ID,
-        scope: SCOPES,
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
-      });
-      
-      // Check if already signed in
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      if (authInstance.isSignedIn.get()) {
-        setDriveConnected(true);
-        setAccessToken(authInstance.currentUser.get().getAuthResponse().access_token);
-      }
-    } catch (error) {
-      console.error('Error initializing Google client:', error);
-    }
-  };
-
-  const connectGoogleDrive = async () => {
-    try {
-      const authInstance = window.gapi.auth2.getAuthInstance();
-      await authInstance.signIn();
-      setDriveConnected(true);
-      setAccessToken(authInstance.currentUser.get().getAuthResponse().access_token);
-    } catch (error) {
-      console.error('Error connecting to Google Drive:', error);
-      alert('Failed to connect to Google Drive. Please try again.');
-    }
-  };
-
-  const disconnectGoogleDrive = () => {
-    const authInstance = window.gapi.auth2.getAuthInstance();
-    authInstance.signOut();
-    setDriveConnected(false);
-    setAccessToken(null);
-    setCurrentFolderId(null);
-  };
-
-  const createEventFolder = async () => {
-    if (!driveConnected) return null;
-    
-    const folderName = `DME Claims - ${eventName} - ${eventDate}`;
-    
-    try {
-      const response = await window.gapi.client.drive.files.create({
-        resource: {
-          name: folderName,
-          mimeType: 'application/vnd.google-apps.folder'
-        },
-        fields: 'id'
-      });
-      
-      setCurrentFolderId(response.result.id);
-      return response.result.id;
-    } catch (error) {
-      console.error('Error creating folder:', error);
-      return null;
-    }
-  };
-
-  const generatePDFBlob = () => {
-    const html = generatePacketHTML();
-    return new Blob([html], { type: 'text/html' });
-  };
-
-  const saveToGoogleDrive = async () => {
-    if (!driveConnected) {
-      alert('Please connect to Google Drive first');
-      return false;
-    }
-
-    setSavingToDrive(true);
-
-    try {
-      let folderId = currentFolderId;
-      if (!folderId) {
-        folderId = await createEventFolder();
-      }
-
-      const fullName = `${data.lastName}_${data.firstName}`.replace(/\s+/g, '_');
-      const fileName = `${fullName}_${eventDate}.html`;
-      const htmlContent = generatePacketHTML();
-
-      const file = new Blob([htmlContent], { type: 'text/html' });
-      const metadata = {
-        name: fileName,
-        mimeType: 'text/html',
-        parents: folderId ? [folderId] : []
-      };
-
-      const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-      form.append('file', file);
-
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        },
-        body: form
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        setSavedPatients(prev => [...prev, {
-          name: `${data.firstName} ${data.lastName}`,
-          fileId: result.id,
-          timestamp: new Date().toLocaleTimeString()
-        }]);
-        setSavingToDrive(false);
-        return true;
-      } else {
-        throw new Error('Upload failed');
-      }
-    } catch (error) {
-      console.error('Error saving to Drive:', error);
-      alert('Failed to save to Google Drive. Please try again.');
-      setSavingToDrive(false);
-      return false;
-    }
-  };
-
-  const sendToBiller = async () => {
-    if (!billerEmail) {
-      alert('Please enter biller email address');
-      return;
-    }
-
-    if (!currentFolderId) {
-      alert('No files saved yet for this event');
-      return;
-    }
-
-    localStorage.setItem('billerEmail', billerEmail);
-
-    try {
-      // Get folder sharing link
-      await window.gapi.client.drive.permissions.create({
-        fileId: currentFolderId,
-        resource: {
-          role: 'reader',
-          type: 'user',
-          emailAddress: billerEmail
-        },
-        sendNotificationEmail: true,
-        emailMessage: `DME Claim Packets for ${eventName} on ${eventDate}. Please find all patient files in this folder.`
-      });
-
-      alert(`✓ Folder shared with ${billerEmail}!\n\nYour biller will receive an email notification with access to all ${savedPatients.length} patient files.`);
-    } catch (error) {
-      console.error('Error sharing folder:', error);
-      
-      // Fallback: Get shareable link
-      try {
-        await window.gapi.client.drive.permissions.create({
-          fileId: currentFolderId,
-          resource: {
-            role: 'reader',
-            type: 'anyone'
-          }
-        });
-
-        const linkResponse = await window.gapi.client.drive.files.get({
-          fileId: currentFolderId,
-          fields: 'webViewLink'
-        });
-
-        const link = linkResponse.result.webViewLink;
-        
-        // Open email client with link
-        const subject = encodeURIComponent(`DME Claim Packets - ${eventName} - ${eventDate}`);
-        const body = encodeURIComponent(`Here are the DME Claim Packets for ${eventName} on ${eventDate}.\n\nFolder Link: ${link}\n\nTotal Patients: ${savedPatients.length}`);
-        window.open(`mailto:${billerEmail}?subject=${subject}&body=${body}`);
-        
-      } catch (linkError) {
-        console.error('Error creating share link:', linkError);
-        alert('Failed to share folder. Please share manually from Google Drive.');
-      }
-    }
-  };
-
   // Auto-save to localStorage every time data changes
   useEffect(() => {
     if (mode === 'intake' && step > 0) {
@@ -297,14 +93,12 @@ const DMEIntakeSystem = () => {
         driversLicenseImg,
         patientPrescription,
         autoRouted,
-        savedPatients,
-        currentFolderId,
         timestamp: new Date().toISOString()
       };
       localStorage.setItem('dme-intake-current', JSON.stringify(saveData));
       setLastSaved(new Date().toLocaleTimeString());
     }
-  }, [data, step, mode, signatures, company, eventDate, eventName, insuranceCardImg, driversLicenseImg, patientPrescription, autoRouted, savedPatients, currentFolderId]);
+  }, [data, step, mode, signatures, company, eventDate, eventName, insuranceCardImg, driversLicenseImg, patientPrescription, autoRouted]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -324,8 +118,6 @@ const DMEIntakeSystem = () => {
           setDriversLicenseImg(parsed.driversLicenseImg);
           setPatientPrescription(parsed.patientPrescription);
           setAutoRouted(parsed.autoRouted);
-          setSavedPatients(parsed.savedPatients || []);
-          setCurrentFolderId(parsed.currentFolderId || null);
         }
       } catch (e) {
         console.error('Error loading saved data:', e);
@@ -490,6 +282,7 @@ const DMEIntakeSystem = () => {
 
   const changeEvent = () => {
     if (window.confirm('Change event? All data will be cleared.')) {
+      localStorage.removeItem('dme-intake-current');
       setMode('setup');
       setStep(0);
       setEventDate('');
@@ -499,8 +292,6 @@ const DMEIntakeSystem = () => {
       setInsuranceCardImg(null);
       setDriversLicenseImg(null);
       setPatientPrescription(null);
-      setSavedPatients([]);
-      setCurrentFolderId(null);
       setData({
         firstName: '', lastName: '', middleName: '', age: '', dob: '', sex: '', 
         address: '', city: '', state: '', zip: '', phone: '', email: '', employer: '',
@@ -533,7 +324,150 @@ const DMEIntakeSystem = () => {
     const today = eventDate || new Date().toLocaleDateString();
     const companyInfo = companies[company] || companies.bgbracing;
     
-    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DME Claim - ${fullName}</title><style>@page{size:letter;margin:0.5in}body{font-family:Arial,sans-serif;font-size:10pt;margin:0;padding:20px}.header{text-align:center;margin-bottom:20px;border-bottom:3px solid #000;padding-bottom:10px}.company-name{font-size:18pt;font-weight:bold}.section-title{background:#333;color:white;padding:8px;font-weight:bold;margin-top:15px}.field{margin:5px 0}.label{font-weight:bold;display:inline-block;min-width:150px}.sig-img{max-height:60px;border-bottom:2px solid #000;margin-top:5px}table{width:100%;border-collapse:collapse;margin:10px 0}th,td{border:1px solid #000;padding:8px;text-align:left}th{background:#e0e0e0;font-weight:bold}ul{margin:5px 0 5px 20px}.box{border:2px solid #000;padding:10px;margin:10px 0;background:#f9f9f9}.highlight-box{border:2px solid #06c;background:#e8f4fd;padding:10px;margin:10px 0}.red-box{border:2px solid #c00;background:#fee;padding:10px;margin:10px 0;font-weight:bold}.yellow-box{border:2px solid #c90;background:#fffbea;padding:10px;margin:10px 0}.doc-img{max-width:100%;max-height:250px;border:2px solid #000;margin:10px 0}@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style></head><body><div class="header"><div class="company-name">${companyInfo.name}</div><div>${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div><div>Phone: ${companyInfo.phone} | NPI: ${companyInfo.npi}</div><div style="margin-top:10px;font-size:14pt;font-weight:bold">DME CLAIM PACKET</div><div>Date: ${eventDate}</div></div>${insuranceCardImg ? `<div class="section-title">INSURANCE CARD</div><div><img src="${insuranceCardImg}" class="doc-img"/></div>` : ''}${driversLicenseImg ? `<div class="section-title">DRIVER'S LICENSE</div><div><img src="${driversLicenseImg}" class="doc-img"/></div>` : ''}<div class="section-title">PATIENT INFORMATION</div><div class="field"><span class="label">Name:</span> ${fullName}</div><div class="field"><span class="label">DOB:</span> ${data.dob} | <span class="label">Age:</span> ${data.age} | <span class="label">Sex:</span> ${data.sex}</div><div class="field"><span class="label">Address:</span> ${data.address}, ${data.city}, ${data.state} ${data.zip}</div><div class="field"><span class="label">Phone:</span> ${data.phone} | <span class="label">Email:</span> ${data.email}</div><div class="section-title">INSURANCE</div><div class="field"><span class="label">Insurance:</span> ${data.primaryIns} | <span class="label">ID:</span> ${data.primaryID}</div><div class="section-title">CLINICAL ASSESSMENT</div><div class="field"><span class="label">Pain Level:</span> ${data.painLevel}/10 | <span class="label">Onset:</span> ${data.onsetDate}</div>${data.mechanicalLBPFindings ? '<div class="highlight-box">✓ Findings consistent with mechanical low back pain requiring external stabilization</div>' : ''}<div class="section-title">DIAGNOSIS</div><div class="field">✓ M54.50 - Low Back Pain</div>${data.additionalICD.map(icd => `<div class="field">✓ ${icd}</div>`).join('')}<div class="red-box">Patient Initials: ${data.patientInitials || '______'}</div><div class="section-title">DEVICES</div><table><tr><th>Device</th><th>Code</th></tr>${data.device.includes('L0631') ? '<tr><td>Lumbar Sacral Orthosis</td><td>L0631</td></tr>' : ''}${data.device.includes('E0730') ? '<tr><td>TENS Unit</td><td>E0730</td></tr>' : ''}</table><div class="section-title">SIGNATURES</div><div class="field"><span class="label">Provider:</span> ${companyInfo.referringProvider}</div>${signatures.provider ? `<img src="${signatures.provider}" class="sig-img"/>` : '<div>_______________________</div>'}<div class="field" style="margin-top:20px"><span class="label">Patient:</span></div>${signatures.acknowledgment ? `<img src="${signatures.acknowledgment}" class="sig-img"/>` : '<div>_______________________</div>'}</body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DME Claim - ${fullName}</title>
+<style>
+@page{size:letter;margin:0.5in}
+body{font-family:Arial,sans-serif;font-size:9pt;margin:0;padding:15px}
+.header{text-align:center;margin-bottom:15px;border-bottom:3px solid #000;padding-bottom:8px}
+.company-name{font-size:16pt;font-weight:bold}
+.section-title{background:#333;color:white;padding:6px 8px;font-weight:bold;margin-top:12px;font-size:10pt}
+.subsection-title{background:#666;color:white;padding:4px 8px;font-weight:bold;margin-top:8px;font-size:9pt}
+.field{margin:3px 0}
+.label{font-weight:bold;display:inline-block;min-width:120px}
+.sig-img{max-height:50px;border-bottom:1px solid #000;margin-top:3px}
+.doc-img{max-width:100%;max-height:200px;border:2px solid #000;margin:10px 0}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+th,td{border:1px solid #000;padding:5px;text-align:left;font-size:9pt}
+th{background:#e0e0e0;font-weight:bold}
+.box{border:1px solid #000;padding:8px;margin:8px 0;background:#f9f9f9}
+.highlight-box{border:2px solid #06c;background:#e8f4fd;padding:8px;margin:8px 0}
+.red-box{border:2px solid #c00;background:#fee;padding:8px;margin:8px 0;font-weight:bold}
+.yellow-box{border:2px solid #c90;background:#fffbea;padding:8px;margin:8px 0}
+.attestation-box{border:1px solid #333;padding:10px;margin:10px 0;background:#fafafa}
+.attestation-text{font-size:8pt;margin-bottom:8px;line-height:1.4}
+ul{margin:3px 0 3px 15px;padding:0}
+li{margin:2px 0}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.compliance-box{border:2px solid #000;padding:10px;margin:10px 0;background:#fffff0}
+@media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+</style></head><body>
+
+<div class="header">
+<div class="company-name">${companyInfo.name}</div>
+<div>${companyInfo.address}, ${companyInfo.city}, ${companyInfo.state} ${companyInfo.zip}</div>
+<div>Phone: ${companyInfo.phone} | Fax: ${companyInfo.fax} | NPI: ${companyInfo.npi}</div>
+<div style="margin-top:8px;font-size:12pt;font-weight:bold">DME CLAIM PACKET</div>
+<div>Date of Service: ${today}</div>
+</div>
+
+${insuranceCardImg ? `<div class="section-title">INSURANCE CARD</div><div><img src="${insuranceCardImg}" class="doc-img"/></div>` : ''}
+
+${driversLicenseImg ? `<div class="section-title">DRIVER'S LICENSE</div><div><img src="${driversLicenseImg}" class="doc-img"/></div>` : ''}
+
+<div class="section-title">PATIENT INFORMATION</div>
+<div class="grid-2">
+<div><span class="label">Name:</span> ${fullName}</div>
+<div><span class="label">DOB:</span> ${data.dob} | Age: ${data.age} | Sex: ${data.sex}</div>
+</div>
+<div class="field"><span class="label">Address:</span> ${data.address}, ${data.city}, ${data.state} ${data.zip}</div>
+<div class="field"><span class="label">Phone:</span> ${data.phone} | <span class="label">Email:</span> ${data.email}</div>
+${data.employer ? `<div class="field"><span class="label">Employer:</span> ${data.employer}</div>` : ''}
+
+<div class="section-title">INSURANCE INFORMATION</div>
+<div class="field"><span class="label">Insurance:</span> ${data.primaryIns}</div>
+<div class="field"><span class="label">Member ID:</span> ${data.primaryID} | <span class="label">Group:</span> ${data.primaryGroup || 'N/A'}</div>
+
+<div class="section-title">MEDICAL HISTORY & PRIOR CARE</div>
+${data.medicalHistory.length > 0 ? `<div class="field"><span class="label">Medical History:</span> ${data.medicalHistory.join(', ')}</div>` : '<div class="field"><span class="label">Medical History:</span> None reported</div>'}
+${data.priorCare.length > 0 ? `<div class="field"><span class="label">Prior Care:</span> ${data.priorCare.join(', ')}</div>` : '<div class="field"><span class="label">Prior Care:</span> None reported</div>'}
+
+<div class="section-title">CLINICAL ASSESSMENT</div>
+<div class="field"><span class="label">Chief Complaints:</span> ${data.complaints.map(c => c === 'lbp' ? 'Lower back pain' : c === 'lumbar' ? 'Lumbar instability' : c === 'degen' ? 'Degenerative disc' : c).join(', ') || 'None selected'}</div>
+<div class="grid-2">
+<div><span class="label">Pain Level:</span> ${data.painLevel}/10</div>
+<div><span class="label">Onset Date:</span> ${data.onsetDate}</div>
+</div>
+<div class="field"><span class="label">Duration:</span> ${data.duration || 'Not specified'}</div>
+${data.limitations.length > 0 ? `<div class="field"><span class="label">Functional Limitations:</span> ${data.limitations.join(', ')}</div>` : ''}
+
+<div class="subsection-title">Objective Assessment</div>
+<div class="field"><span class="label">Posture/Gait:</span> ${data.postureGait || 'Not assessed'}</div>
+<div class="field"><span class="label">Lumbar Mobility:</span> ${data.lumbarMobility || 'Not assessed'}</div>
+${data.painBehavior.length > 0 ? `<div class="field"><span class="label">Pain Behavior:</span> ${data.painBehavior.join(', ')}</div>` : ''}
+${data.functionalImpact.length > 0 ? `<div class="field"><span class="label">Functional Impact:</span> ${data.functionalImpact.join(', ')}</div>` : ''}
+${data.otherNotes ? `<div class="field"><span class="label">Other Notes:</span> ${data.otherNotes}</div>` : ''}
+
+${data.mechanicalLBPFindings ? '<div class="highlight-box">✓ Findings are consistent with mechanical low back pain requiring external stabilization to reduce motion, improve function, and decrease pain.</div>' : ''}
+
+<div class="section-title">DIAGNOSIS & PLAN</div>
+<div class="subsection-title">ICD-10 Codes</div>
+<div class="field">✓ M54.50 - Low Back Pain, Unspecified</div>
+${data.additionalICD.includes('M51.16') ? '<div class="field">✓ M51.16 - Degenerative Disc Disease (Lumbar)</div>' : ''}
+${data.additionalICD.includes('M47.819') ? '<div class="field">✓ M47.819 - Spondylosis, Unspecified</div>' : ''}
+
+<div class="box">
+<strong>Assessment Summary:</strong><br/>
+Evaluation demonstrates mechanical low back pain with postural imbalance and limited motion consistent with need for external stabilization to reduce pain and improve function.
+<ul>
+<li>Recommend Lumbar Orthosis (L0631) and/or TENS Unit (E0730) for reduction of pain and stabilization</li>
+<li>Refer to chiropractic or physical therapy for active rehabilitation</li>
+<li>Instruct patient on home stretching, posture, and brace wear</li>
+</ul>
+</div>
+
+<div class="box">
+The above listed orthotic devices are medically necessary for treatment of lower back pain (M54.50) as part of a conservative care plan. The orthosis is prescribed to:
+<ul>
+<li>Reduce pain by limiting trunk motion</li>
+<li>Improve function and posture</li>
+<li>Prevent further injury and support spinal stability</li>
+</ul>
+Conservative measures (exercise, OTC medication, chiropractic/PT care) have been reviewed. Patient instructed in safe use, care, and expected outcomes.
+</div>
+
+<div class="red-box">Patient Initials: ${data.patientInitials || '______'}</div>
+
+<div class="section-title">DEVICES PRESCRIBED</div>
+<table>
+<tr><th>Device</th><th>HCPCS Code</th><th>Indication</th></tr>
+${data.device.includes('L0631') ? '<tr><td>Lumbar Sacral Orthosis</td><td>L0631</td><td>Pain reduction and stabilization</td></tr>' : ''}
+${data.device.includes('E0730') ? '<tr><td>TENS Unit</td><td>E0730</td><td>Adjunct pain management</td></tr>' : ''}
+</table>
+<div class="field"><span class="label">Frequency:</span> 6 hours per day</div>
+<div class="field"><span class="label">Duration:</span> 3 months</div>
+<div class="field"><span class="label">Length of Need:</span> ${data.lengthOfNeed}</div>
+<div class="field"><span class="label">Date Delivered:</span> ${data.dateDelivered || today}</div>
+
+<div class="compliance-box">
+<strong>COMPLIANCE STATEMENT:</strong><br/>
+This orthosis is not prescribed for comfort or posture correction alone but as part of a structured conservative treatment plan consistent with Aetna CPB #298 and CMS LCD L33802.
+</div>
+
+<div class="section-title">SIGNATURES</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">Provider Attestation</div>
+<div class="attestation-text">${providerAttestationText}</div>
+<div class="field"><span class="label">Provider:</span> ${companyInfo.referringProvider} | NPI: ${companyInfo.referringNPI}</div>
+${signatures.provider ? `<img src="${signatures.provider}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">Patient Acknowledgment</div>
+<div class="attestation-text">${patientAcknowledgmentText}</div>
+${signatures.acknowledgment ? `<img src="${signatures.acknowledgment}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+<div class="attestation-box">
+<div class="subsection-title" style="margin-top:0">HIPAA Acknowledgment</div>
+<div class="attestation-text">${hipaaAcknowledgmentText}</div>
+${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div style="border-bottom:1px solid #000;height:40px;margin-top:5px"></div>'}
+<div class="field"><span class="label">Date:</span> ${today}</div>
+</div>
+
+</body></html>`;
   };
 
   const handlePrint = () => {
@@ -547,71 +481,24 @@ const DMEIntakeSystem = () => {
     win.onload = () => setTimeout(() => {win.focus();win.print()}, 500);
   };
 
-  const handleSaveAndNext = async () => {
-    const saved = await saveToGoogleDrive();
-    if (saved) {
-      startNewPatient();
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50 p-4">
       <div className="max-w-4xl mx-auto">
         
-        {/* Online/Offline & Drive Status */}
+        {/* Online/Offline Status Indicator */}
         {mode !== 'setup' && (
-          <div className="fixed top-4 right-4 flex flex-col gap-2 z-50">
-            <div className={`px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              {isOnline ? <Wifi className="w-5 h-5"/> : <WifiOff className="w-5 h-5"/>}
-              <div>
-                <div className="font-bold text-sm">{isOnline ? 'Online' : 'Offline'}</div>
-                {lastSaved && <div className="text-xs">Saved: {lastSaved}</div>}
-              </div>
+          <div className={`fixed top-4 right-4 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 z-50 ${isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {isOnline ? <Wifi className="w-5 h-5"/> : <WifiOff className="w-5 h-5"/>}
+            <div>
+              <div className="font-bold text-sm">{isOnline ? 'Online' : 'Offline'}</div>
+              {lastSaved && <div className="text-xs">Saved: {lastSaved}</div>}
             </div>
-            {driveConnected && (
-              <div className="px-4 py-2 rounded-lg shadow-lg bg-blue-100 text-blue-800 flex items-center gap-2">
-                <Cloud className="w-5 h-5"/>
-                <span className="text-sm font-bold">Drive Connected</span>
-              </div>
-            )}
           </div>
         )}
         
         {mode === 'setup' && (
           <div className="bg-white rounded-lg shadow p-8">
             <h1 className="text-3xl font-bold mb-6">Event Setup</h1>
-            
-            {/* Google Drive Connection */}
-            <div className="mb-6 p-4 border-2 rounded-lg bg-gray-50">
-              <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-                <Cloud className="w-6 h-6"/>Google Drive Connection
-              </h2>
-              {!driveConnected ? (
-                <div>
-                  <p className="text-sm text-gray-600 mb-3">Connect to save patient files and send to your biller.</p>
-                  <button onClick={connectGoogleDrive} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                    <Cloud className="w-5 h-5"/>Connect Google Drive
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <p className="text-green-600 font-bold flex items-center gap-2"><Check className="w-5 h-5"/>Connected to Google Drive</p>
-                  <button onClick={disconnectGoogleDrive} className="text-sm text-gray-500 hover:text-gray-700">Disconnect</button>
-                </div>
-              )}
-            </div>
-
-            {/* Biller Email */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Biller Email (for sending completed packets)</label>
-              <input 
-                type="email" 
-                value={billerEmail} 
-                onChange={(e) => setBillerEmail(e.target.value)} 
-                placeholder="biller@example.com" 
-                className="w-full border-2 rounded-lg px-4 py-3 text-lg"
-              />
-            </div>
             
             <div className="mb-6">
               <h2 className="text-xl font-bold mb-4">Event Information</h2>
@@ -685,9 +572,6 @@ const DMEIntakeSystem = () => {
               <div>
                 <h1 className="text-2xl font-bold">Patient Intake - Step {step} of 7</h1>
                 <p className="text-sm text-blue-600">{company ? companies[company].name : 'No company selected'} | Date: {eventDate}</p>
-                {savedPatients.length > 0 && (
-                  <p className="text-sm text-green-600 mt-1">✓ {savedPatients.length} patient(s) saved to Drive</p>
-                )}
               </div>
               <div className="flex gap-2">
                 <button onClick={startNewPatient} className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">New Patient</button>
@@ -882,7 +766,7 @@ const DMEIntakeSystem = () => {
 
         {mode === 'intake' && step === 5 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">CLINICAL ASSESSMENT & PLAN</h2>
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">DIAGNOSIS & DEVICE SELECTION</h2>
             
             <div className="mb-6">
               <h3 className="font-bold mb-2 bg-gray-200 p-2 rounded">Primary ICD-10</h3>
@@ -907,18 +791,12 @@ const DMEIntakeSystem = () => {
             </div>
 
             <div className="mb-6 p-4 border-2 border-blue-300 rounded-lg bg-blue-50">
-              <h3 className="font-bold mb-3">UM Assessment Summary</h3>
+              <h3 className="font-bold mb-3">Assessment Summary</h3>
               <p className="mb-3">Evaluation demonstrates mechanical low back pain with postural imbalance and limited motion consistent with need for external stabilization to reduce pain and improve function.</p>
-              <ul className="list-disc ml-5 mb-4 space-y-1 text-sm">
-                <li>Recommend Lumbar Orthosis (L0631) and TENS Unit (E0730) for reduction of pain and stabilization</li>
-                <li>Refer to chiropractic or physical therapy for active rehabilitation</li>
-                <li>Instruct patient on home stretching, posture, and brace wear</li>
-                <li>If patient self-treats/uses OTC drugs, patient reports self-management and declines formal treatment</li>
-              </ul>
               <div className="mt-4 p-3 bg-red-50 border-2 border-red-400 rounded">
                 <label className="flex items-center">
                   <span className="font-bold text-red-800 mr-3">Patient Initials: *</span>
-                  <input type="text" value={data.patientInitials} onChange={(e) => update('patientInitials', e.target.value)} className="border-2 border-red-400 rounded px-3 py-1 w-20 text-center font-bold" maxLength="3"/>
+                  <input type="text" value={data.patientInitials} onChange={(e) => update('patientInitials', e.target.value.toUpperCase())} className="border-2 border-red-400 rounded px-3 py-1 w-20 text-center font-bold" maxLength="4"/>
                 </label>
               </div>
             </div>
@@ -936,26 +814,27 @@ const DMEIntakeSystem = () => {
                 <label className="flex items-center p-4 border-2 rounded cursor-pointer hover:bg-blue-50">
                   <input type="checkbox" checked={data.device.includes('E0730')} onChange={() => toggleArray('device', 'E0730')} className="mr-3 w-6 h-6"/>
                   <div>
-                    <div className="font-bold">E0730 - TENS Unit (Optional)</div>
+                    <div className="font-bold">E0730 - TENS Unit</div>
                     <div className="text-sm text-gray-600">Adjunct pain management</div>
                   </div>
                 </label>
               </div>
             </div>
 
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Length of Need *</label>
-              <select value={data.lengthOfNeed} onChange={(e) => update('lengthOfNeed', e.target.value)} className="w-full border rounded px-3 py-2">
-                <option value="3 months">3 Months</option>
-                <option value="6 months">6 Months</option>
-                <option value="12 months">12 Months</option>
-                <option value="Lifetime">Lifetime</option>
-              </select>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium mb-1">Date Delivered</label>
-              <input type="date" value={data.dateDelivered} onChange={(e) => update('dateDelivered', e.target.value)} className="w-full border rounded px-3 py-2"/>
+            <div className="grid md:grid-cols-2 gap-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium mb-2">Length of Need *</label>
+                <select value={data.lengthOfNeed} onChange={(e) => update('lengthOfNeed', e.target.value)} className="w-full border rounded px-3 py-2">
+                  <option value="3 months">3 Months</option>
+                  <option value="6 months">6 Months</option>
+                  <option value="12 months">12 Months</option>
+                  <option value="Lifetime">Lifetime</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">Date Delivered</label>
+                <input type="date" value={data.dateDelivered} onChange={(e) => update('dateDelivered', e.target.value)} className="w-full border rounded px-3 py-2"/>
+              </div>
             </div>
 
             <div className="p-4 border-2 border-yellow-400 rounded-lg bg-yellow-50 mb-6">
@@ -1041,71 +920,52 @@ const DMEIntakeSystem = () => {
 
         {mode === 'intake' && step === 7 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">SAVE & COMPLETE</h2>
+            <h2 className="text-lg font-bold mb-4 bg-gray-800 text-white p-2 rounded">REVIEW & PRINT</h2>
             
             <div className="bg-green-50 border-2 border-green-500 rounded-lg p-6 mb-6">
               <h3 className="font-bold text-green-800 mb-3 text-xl">✓ Patient Ready!</h3>
               <p className="text-green-700 mb-2"><strong>Patient:</strong> {data.firstName} {data.lastName}</p>
-              <p className="text-green-700 mb-4"><strong>Devices:</strong> {data.device.join(', ')}</p>
+              <p className="text-green-700 mb-2"><strong>Insurance:</strong> {data.primaryIns}</p>
+              <p className="text-green-700 mb-2"><strong>Devices:</strong> {data.device.map(d => d === 'L0631' ? 'Lumbar Orthosis' : 'TENS Unit').join(', ')}</p>
+              <p className="text-green-700"><strong>Billing To:</strong> {company ? companies[company].name : 'Not selected'}</p>
             </div>
 
-            {/* Save to Google Drive */}
-            {driveConnected ? (
-              <button 
-                onClick={handleSaveAndNext} 
-                disabled={savingToDrive}
-                className="w-full bg-blue-600 text-white px-6 py-4 rounded-lg text-xl font-bold hover:bg-blue-700 transition flex items-center justify-center gap-2 mb-4 disabled:bg-blue-400"
-              >
-                <Cloud className="w-8 h-8"/>
-                {savingToDrive ? 'Saving...' : 'Save to Drive & Next Patient'}
-              </button>
-            ) : (
-              <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
-                <p className="text-yellow-800 mb-2">Google Drive not connected. Files will only be available for printing.</p>
-                <button onClick={connectGoogleDrive} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 flex items-center gap-2">
-                  <Cloud className="w-5 h-5"/>Connect Google Drive
-                </button>
+            {/* Checklist */}
+            <div className="bg-gray-50 border rounded-lg p-4 mb-6">
+              <h4 className="font-bold mb-3">Checklist:</h4>
+              <div className="space-y-2 text-sm">
+                <div className={data.firstName && data.lastName ? 'text-green-600' : 'text-red-600'}>
+                  {data.firstName && data.lastName ? '✓' : '✗'} Patient name
+                </div>
+                <div className={data.primaryIns ? 'text-green-600' : 'text-red-600'}>
+                  {data.primaryIns ? '✓' : '✗'} Insurance selected
+                </div>
+                <div className={data.device.length > 0 ? 'text-green-600' : 'text-red-600'}>
+                  {data.device.length > 0 ? '✓' : '✗'} Device selected
+                </div>
+                <div className={data.patientInitials ? 'text-green-600' : 'text-red-600'}>
+                  {data.patientInitials ? '✓' : '✗'} Patient initials
+                </div>
+                <div className={signatures.provider ? 'text-green-600' : 'text-red-600'}>
+                  {signatures.provider ? '✓' : '✗'} Provider signature
+                </div>
+                <div className={signatures.acknowledgment ? 'text-green-600' : 'text-red-600'}>
+                  {signatures.acknowledgment ? '✓' : '✗'} Patient signature
+                </div>
+                <div className={signatures.hipaa ? 'text-green-600' : 'text-yellow-600'}>
+                  {signatures.hipaa ? '✓' : '○'} HIPAA signature (optional)
+                </div>
               </div>
-            )}
+            </div>
 
             <button onClick={handlePrint} className="w-full bg-green-600 text-white px-6 py-4 rounded-lg text-xl font-bold hover:bg-green-700 transition flex items-center justify-center gap-2 mb-4">
-              <Printer className="w-8 h-8"/>Print Claim Packet
+              <Printer className="w-8 h-8"/>Print / Save PDF
             </button>
-
-            {/* Saved Patients Summary */}
-            {savedPatients.length > 0 && (
-              <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4 mb-4">
-                <h4 className="font-bold mb-2 flex items-center gap-2"><FolderOpen className="w-5 h-5"/>Saved to Google Drive ({savedPatients.length})</h4>
-                <ul className="text-sm space-y-1">
-                  {savedPatients.map((p, i) => (
-                    <li key={i} className="flex items-center gap-2"><Check className="w-4 h-4 text-green-600"/>{p.name} - {p.timestamp}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Send to Biller */}
-            {savedPatients.length > 0 && driveConnected && (
-              <div className="bg-purple-50 border-2 border-purple-300 rounded-lg p-4 mb-4">
-                <h4 className="font-bold mb-2 flex items-center gap-2"><Send className="w-5 h-5"/>Send to Biller</h4>
-                <div className="flex gap-2">
-                  <input 
-                    type="email" 
-                    value={billerEmail} 
-                    onChange={(e) => setBillerEmail(e.target.value)} 
-                    placeholder="biller@example.com" 
-                    className="flex-1 border rounded px-3 py-2"
-                  />
-                  <button onClick={sendToBiller} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 flex items-center gap-2">
-                    <Send className="w-5 h-5"/>Send
-                  </button>
-                </div>
-                <p className="text-sm text-purple-700 mt-2">Shares the entire event folder with {savedPatients.length} patient file(s)</p>
-              </div>
-            )}
+            
+            <p className="text-sm text-gray-600 text-center mb-6">Tip: On iPad, tap Share → "Save to Files" to save as PDF</p>
 
             <div className="flex gap-4">
-              <button onClick={startNewPatient} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">New Patient (Same Event)</button>
+              <button onClick={startNewPatient} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">Next Patient</button>
               <button onClick={changeEvent} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-gray-700">End Event</button>
             </div>
           </div>
