@@ -30,7 +30,20 @@ const DMEIntakeSystem = () => {
   const hipaaCanvasRef = useRef(null);
 
   const startCardCapture = async (type) => {
+    // First ensure any existing stream is stopped
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
+      streamRef.current = null;
+    }
+    
     setShowCardCapture(type);
+    
+    // Small delay to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } 
@@ -244,9 +257,23 @@ const DMEIntakeSystem = () => {
   const handleInsCardUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    // Compress the image
     const reader = new FileReader();
     reader.onload = (evt) => {
-      setInsuranceCardImg(evt.target.result);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 600;
+        const scale = maxWidth / img.width;
+        canvas.width = maxWidth;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+        setInsuranceCardImg(compressedData);
+      };
+      img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -254,9 +281,23 @@ const DMEIntakeSystem = () => {
   const handleDLUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
+    // Compress the image
     const reader = new FileReader();
     reader.onload = (evt) => {
-      setDriversLicenseImg(evt.target.result);
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxWidth = 600;
+        const scale = maxWidth / img.width;
+        canvas.width = maxWidth;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+        setDriversLicenseImg(compressedData);
+      };
+      img.src = evt.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -659,7 +700,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
 
             <div className="mb-8 p-6 border-2 border-blue-300 rounded-lg bg-blue-50">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Camera className="w-6 h-6"/>Insurance Card (Optional)</h2>
-              <input type="file" ref={insCardRef} onChange={handleInsCardUpload} accept="image/*" capture="environment" className="hidden"/>
+              <input type="file" ref={insCardRef} onChange={handleInsCardUpload} accept="image/*" className="hidden"/>
               <div className="flex gap-3">
                 <button onClick={() => startCardCapture('insurance')} className="bg-blue-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-blue-700">
                   <Camera className="w-5 h-5"/>{insuranceCardImg ? 'Retake' : 'Capture'} Card
@@ -673,7 +714,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
 
             <div className="mb-8 p-6 border-2 rounded-lg">
               <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Scan className="w-6 h-6"/>Driver's License (Optional)</h2>
-              <input type="file" ref={dlRef} onChange={handleDLUpload} accept="image/*" capture="environment" className="hidden"/>
+              <input type="file" ref={dlRef} onChange={handleDLUpload} accept="image/*" className="hidden"/>
               <div className="flex gap-3">
                 <button onClick={() => startCardCapture('license')} className="bg-gray-600 text-white px-6 py-3 rounded-lg flex items-center gap-2 hover:bg-gray-700">
                   <Camera className="w-5 h-5"/>{driversLicenseImg ? 'Retake' : 'Capture'} License
@@ -765,7 +806,7 @@ ${signatures.hipaa ? `<img src="${signatures.hipaa}" class="sig-img"/>` : '<div 
               </div>
               <div className="grid md:grid-cols-3 gap-4">
                 <div><label className="block text-sm font-medium mb-1">DOB *</label><input type="date" value={data.dob} onChange={(e) => {update('dob', e.target.value);const age = Math.floor((new Date() - new Date(e.target.value)) / 31557600000);update('age', age.toString());}} max={new Date().toISOString().split('T')[0]} className="w-full border rounded px-3 py-2"/></div>
-                <div><label className="block text-sm font-medium mb-1">Age</label><input type="text" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100"/></div>
+                <div><label className="block text-sm font-medium mb-1">Age</label><input type="text" value={data.age} readOnly className="w-full border rounded px-3 py-2 bg-gray-100" style={{fontSize: '16px'}}/></div>
                 <div><label className="block text-sm font-medium mb-1">Sex *</label><div className="flex gap-4 mt-2"><label className="flex items-center"><input type="radio" value="M" checked={data.sex === 'M'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Male</label><label className="flex items-center"><input type="radio" value="F" checked={data.sex === 'F'} onChange={(e) => update('sex', e.target.value)} className="mr-2"/>Female</label></div></div>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
